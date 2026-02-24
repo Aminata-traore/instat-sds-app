@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase/client";
+import { supabaseClient } from "@/lib/supabase/client";
 import { useRequireAuth } from "@/lib/auth/requireAuth";
 
 export default function AdminFiche1DetailPage() {
