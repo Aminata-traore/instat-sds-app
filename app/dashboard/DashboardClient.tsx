@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRequireAuth } from "@/lib/auth/requireAuth";
+import { supabaseClient } from "@/lib/supabase/client";
 import { AppShell } from "@/app/_components/AppShell";
 
 export function DashboardClient() {
