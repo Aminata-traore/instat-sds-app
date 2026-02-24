@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { supabaseClient } from "@/lib/supabase/client";
 import { useRequireAuth } from "@/lib/auth/requireAuth";
 import { AppShell } from "@/app/_components/AppShell";
 import { Fiche1Form } from "@/app/fiche1/_components/Fiche1Form";
