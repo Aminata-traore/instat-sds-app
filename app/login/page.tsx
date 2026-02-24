@@ -1,46 +1,73 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 
 export default function LoginPage() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
   const signIn = async () => {
     setMsg(null);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) setMsg(error.message);
-    else setMsg("Connexion OK. Retourne au tableau de bord.");
+    setBusy(true);
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+      if (error) throw new Error(error.message);
+      router.replace("/dashboard");
+    } catch (e: any) {
+      setMsg(e?.message ?? "Erreur de connexion");
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
-    <main style={{ padding: 24, maxWidth: 420 }}>
-      <h1 style={{ fontSize: 22, fontWeight: 700 }}>Connexion — INSTAT</h1>
+    <main className="min-h-screen bg-neutral-50 px-4 py-12">
+      <div className="mx-auto max-w-md rounded-2xl border bg-white p-6 shadow-sm">
+        <div className="text-xl font-extrabold tracking-tight">Connexion — INSTAT</div>
 
-      <label>Email</label>
-      <input
-        style={{ width: "100%", padding: 10, margin: "6px 0 12px" }}
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        placeholder="agent@instat.ml"
-      />
+        <div className="mt-5 space-y-3">
+          <div>
+            <label className="text-sm font-semibold">Email</label>
+            <input
+              className="mt-1 w-full rounded-xl border px-3 py-2 text-sm outline-none focus:ring-2"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="agent@instat.ml"
+              autoComplete="email"
+            />
+          </div>
 
-      <label>Mot de passe</label>
-      <input
-        style={{ width: "100%", padding: 10, margin: "6px 0 12px" }}
-        type="password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        placeholder="••••••••"
-      />
+          <div>
+            <label className="text-sm font-semibold">Mot de passe</label>
+            <input
+              className="mt-1 w-full rounded-xl border px-3 py-2 text-sm outline-none focus:ring-2"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              autoComplete="current-password"
+            />
+          </div>
+        </div>
 
-      <button onClick={signIn} style={{ padding: 10, width: "100%" }}>
-        Se connecter
-      </button>
+        <button
+          onClick={signIn}
+          disabled={busy}
+          className="mt-5 w-full rounded-xl bg-black px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+        >
+          {busy ? "Connexion…" : "Se connecter"}
+        </button>
 
-      {msg && <p style={{ marginTop: 12 }}>{msg}</p>}
+        {msg && <p className="mt-4 text-sm text-red-600">{msg}</p>}
+      </div>
     </main>
   );
 }
