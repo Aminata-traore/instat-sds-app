@@ -2,17 +2,9 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 let _supabase: SupabaseClient | null = null;
 
-/**
- * IMPORTANT:
- * - Vercel/Next prerender (build) exécute du code côté serveur.
- * - On NE DOIT PAS créer Supabase côté serveur avec NEXT_PUBLIC_*,
- *   sinon on casse le build ("supabaseUrl is required").
- *
- * => On crée le client uniquement côté navigateur.
- */
 export function supabaseClient(): SupabaseClient {
   if (typeof window === "undefined") {
-    throw new Error("supabaseClient() must be called in the browser (client component).");
+    throw new Error("supabaseClient() must be called in the browser.");
   }
 
   if (_supabase) return _supabase;
