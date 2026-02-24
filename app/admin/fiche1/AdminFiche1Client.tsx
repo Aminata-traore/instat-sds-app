@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRequireAuth } from "@/lib/auth/requireAuth";
 import { AppShell } from "@/app/_components/AppShell";
-import { supabase } from "@/lib/supabase/client";
+import { supabaseClient } from "@/lib/supabase/client";
 
 type Row = {
   id: string;
