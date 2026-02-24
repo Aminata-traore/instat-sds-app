@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase/client";
+import { supabaseClient } from "@/lib/supabase/client";
 
 export function useRequireAuth() {
   const router = useRouter();
@@ -10,6 +10,8 @@ export function useRequireAuth() {
 
   useEffect(() => {
     let mounted = true;
+
+    const supabase = supabaseClient();
 
     (async () => {
       const { data } = await supabase.auth.getSession();
