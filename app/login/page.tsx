@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabaseClient } from "@/lib/supabase/client";
 
@@ -8,13 +8,33 @@ export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [msg, setMsg] = useState<string | null>(null);
+
   const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  // Si déjà connecté → dashboard
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const supabase = supabaseClient();
+        const { data } = await supabase.auth.getSession();
+        if (!alive) return;
+        if (data.session) router.replace("/dashboard");
+      } catch {
+        // ignore
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [router]);
 
   const signIn = async () => {
     setMsg(null);
     setBusy(true);
     try {
+      const supabase = supabaseClient();
       const { error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password,
