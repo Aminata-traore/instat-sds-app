@@ -27,15 +27,19 @@ export default function MesFichesPage() {
     setBusy(true);
 
     try {
+      // ✅ CRÉATION DU CLIENT SUPABASE (OBLIGATOIRE)
+      const supabase = supabaseClient();
+
       const { data: userData, error: userErr } = await supabase.auth.getUser();
       if (userErr) throw new Error(userErr.message);
+
       if (!userData.user) {
         setInfo("Utilisateur non connecté.");
         setRows([]);
         return;
       }
 
-      // Avec RLS: pas besoin de filtrer par user_id, Supabase renvoie seulement tes lignes.
+      // Avec RLS : Supabase renvoie uniquement les lignes de l'utilisateur
       const { data, error } = await supabase
         .from("answers_fiche1")
         .select("id, created_at, annee, numero_fiche, statut")
@@ -44,7 +48,9 @@ export default function MesFichesPage() {
       if (error) throw new Error(error.message);
 
       setRows((data ?? []) as FicheRow[]);
-      if (!data || data.length === 0) setInfo("Aucune fiche pour le moment.");
+      if (!data || data.length === 0) {
+        setInfo("Aucune fiche pour le moment.");
+      }
     } catch (e: any) {
       setError(e?.message ?? "Erreur inconnue");
       setRows([]);
@@ -62,21 +68,34 @@ export default function MesFichesPage() {
 
   return (
     <main style={{ padding: 24, maxWidth: 1100 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-        <h1 style={{ fontSize: 22, fontWeight: 800 }}>Mes fiches (Fiche 1)</h1>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: 12,
+          flexWrap: "wrap",
+        }}
+      >
+        <h1 style={{ fontSize: 22, fontWeight: 800 }}>
+          Mes fiches (Fiche 1)
+        </h1>
 
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           <button onClick={loadRows} disabled={busy} style={{ padding: "8px 12px" }}>
             {busy ? "..." : "Rafraîchir"}
           </button>
 
-          <Link href="/fiche1/nouvelle" style={{ padding: "8px 12px", border: "1px solid #ddd", borderRadius: 10 }}>
+          <Link
+            href="/fiche1/nouvelle"
+            style={{ padding: "8px 12px", border: "1px solid #ddd", borderRadius: 10 }}
+          >
             ➕ Nouvelle fiche
           </Link>
         </div>
       </div>
 
-      {error && <p style={{ marginTop: 12, color: "crimson" }}>Erreur: {error}</p>}
+      {error && <p style={{ marginTop: 12, color: "crimson" }}>Erreur : {error}</p>}
       {info && !error && <p style={{ marginTop: 12 }}>{info}</p>}
 
       <table style={{ marginTop: 12, width: "100%", borderCollapse: "collapse" }}>
@@ -95,9 +114,15 @@ export default function MesFichesPage() {
               <td style={{ borderBottom: "1px solid #eee", padding: 8 }}>
                 {r.created_at ? new Date(r.created_at).toLocaleString() : "-"}
               </td>
-              <td style={{ borderBottom: "1px solid #eee", padding: 8 }}>{r.annee ?? "-"}</td>
-              <td style={{ borderBottom: "1px solid #eee", padding: 8 }}>{r.numero_fiche ?? "-"}</td>
-              <td style={{ borderBottom: "1px solid #eee", padding: 8 }}>{r.statut ?? "-"}</td>
+              <td style={{ borderBottom: "1px solid #eee", padding: 8 }}>
+                {r.annee ?? "-"}
+              </td>
+              <td style={{ borderBottom: "1px solid #eee", padding: 8 }}>
+                {r.numero_fiche ?? "-"}
+              </td>
+              <td style={{ borderBottom: "1px solid #eee", padding: 8 }}>
+                {r.statut ?? "-"}
+              </td>
             </tr>
           ))}
         </tbody>
