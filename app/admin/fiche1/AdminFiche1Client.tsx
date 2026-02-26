@@ -6,11 +6,7 @@ import { useRequireAuth } from "@/lib/auth/requireAuth";
 import { AppShell } from "@/app/_components/AppShell";
 import { supabaseClient } from "@/lib/supabase/client";
 
-type Row = {
-  id: string;
-  created_at?: string;
-  statut?: string;
-};
+type Row = { id: string; created_at?: string; statut?: string };
 
 export function AdminFiche1Client() {
   const { loading } = useRequireAuth();
@@ -23,6 +19,7 @@ export function AdminFiche1Client() {
       setBusy(true);
       setErr(null);
       try {
+        const supabase = supabaseClient();
         const { data, error } = await supabase
           .from("answers_fiche1")
           .select("id, created_at, statut")
