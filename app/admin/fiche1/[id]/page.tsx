@@ -1,15 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabaseClient } from "@/lib/supabase/client";
 import { useRequireAuth } from "@/lib/auth/requireAuth";
+
+type ValidationStatus = "valide" | "rejete";
 
 export default function AdminFiche1DetailPage() {
   const { loading } = useRequireAuth();
   const params = useParams();
   const router = useRouter();
-  const id = String(params.id);
+
+  const id = useMemo(() => String((params as any)?.id ?? ""), [params]);
 
   const [role, setRole] = useState<string | null>(null);
   const [row, setRow] = useState<any>(null);
@@ -18,42 +21,71 @@ export default function AdminFiche1DetailPage() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
+    let alive = true;
+
     (async () => {
       setError(null);
 
-      const { data: u } = await supabase.auth.getUser();
-      const uid = u.user?.id;
-      if (!uid) return;
+      try {
+        const supabase = supabaseClient(); // ✅ IMPORTANT
 
-      const { data: prof } = await supabase.from("profiles").select("role").eq("id", uid).maybeSingle();
-      const r = (prof?.role ?? "agent") as string;
-      setRole(r);
+        const { data: u, error: eUser } = await supabase.auth.getUser();
+        if (eUser) throw new Error(eUser.message);
 
-      if (!["admin", "validateur"].includes(r)) {
-        setError("Accès refusé: vous n’êtes pas validateur/admin.");
-        return;
+        const uid = u.user?.id;
+        if (!uid) throw new Error("Utilisateur non connecté");
+
+        const { data: prof, error: eProf } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", uid)
+          .maybeSingle();
+
+        if (eProf) throw new Error(eProf.message);
+
+        const r = (prof?.role ?? "agent") as string;
+        if (!alive) return;
+        setRole(r);
+
+        if (!["admin", "validateur"].includes(r)) {
+          setError("Accès refusé: vous n’êtes pas validateur/admin.");
+          return;
+        }
+
+        const { data, error: eRow } = await supabase
+          .from("answers_fiche1")
+          .select("*")
+          .eq("id", id)
+          .single();
+
+        if (!alive) return;
+        if (eRow) setError(eRow.message);
+        else setRow(data);
+      } catch (e: any) {
+        if (!alive) return;
+        setError(e?.message ?? "Erreur inconnue");
       }
-
-      const { data, error } = await supabase
-        .from("answers_fiche1")
-        .select("*")
-        .eq("id", id)
-        .single();
-
-      if (error) setError(error.message);
-      else setRow(data);
     })();
+
+    return () => {
+      alive = false;
+    };
   }, [id]);
 
-  const setStatus = async (statut_validation: "valide" | "rejete") => {
+  const setStatus = async (statut_validation: ValidationStatus) => {
     setError(null);
     setBusy(true);
+
     try {
-      const { data: u } = await supabase.auth.getUser();
+      const supabase = supabaseClient(); // ✅ IMPORTANT
+
+      const { data: u, error: eUser } = await supabase.auth.getUser();
+      if (eUser) throw new Error(eUser.message);
+
       const uid = u.user?.id;
       if (!uid) throw new Error("Utilisateur non connecté");
 
-      const { error } = await supabase
+      const { error: eUpd } = await supabase
         .from("answers_fiche1")
         .update({
           statut_validation,
@@ -63,11 +95,11 @@ export default function AdminFiche1DetailPage() {
         })
         .eq("id", id);
 
-      if (error) throw new Error(error.message);
+      if (eUpd) throw new Error(eUpd.message);
 
       router.push("/admin/fiche1");
     } catch (e: any) {
-      setError(e.message ?? "Erreur inconnue");
+      setError(e?.message ?? "Erreur inconnue");
     } finally {
       setBusy(false);
     }
@@ -88,7 +120,7 @@ export default function AdminFiche1DetailPage() {
         <>
           <div style={{ marginTop: 14, padding: 14, border: "1px solid #e5e7eb", borderRadius: 10 }}>
             <h2 style={{ fontSize: 18, fontWeight: 700 }}>Résumé</h2>
-            <p>Date: {new Date(row.created_at).toLocaleString()}</p>
+            <p>Date: {row.created_at ? new Date(row.created_at).toLocaleString() : "-"}</p>
             <p>Année: {row.annee ?? "-"}</p>
             <p>N° fiche: {row.numero_fiche ?? "-"}</p>
             <p>Statut: {row.statut ?? "-"}</p>
@@ -97,7 +129,9 @@ export default function AdminFiche1DetailPage() {
 
           <div style={{ marginTop: 14, padding: 14, border: "1px solid #e5e7eb", borderRadius: 10 }}>
             <h2 style={{ fontSize: 18, fontWeight: 700 }}>Données (JSON)</h2>
-            <pre style={{ whiteSpace: "pre-wrap" }}>{JSON.stringify(row.data, null, 2)}</pre>
+            <pre style={{ whiteSpace: "pre-wrap" }}>
+              {JSON.stringify(row.data ?? row, null, 2)}
+            </pre>
           </div>
 
           <div style={{ marginTop: 14 }}>
@@ -106,7 +140,7 @@ export default function AdminFiche1DetailPage() {
               value={comment}
               onChange={(e) => setComment(e.target.value)}
               style={{ width: "100%", height: 90, marginTop: 8 }}
-              placeholder="Ex: corriger la structure, champ manquant, etc."
+              placeholder="Ex: champ manquant, incohérence, correction…"
             />
           </div>
 
