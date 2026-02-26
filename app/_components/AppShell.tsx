@@ -36,13 +36,14 @@ export function AppShell({ title, children }: { title: string; children: React.R
   useEffect(() => {
     let alive = true;
 
-    const supabase = supabaseClient(); // ✅ IMPORTANT
+    const supabase = supabaseClient();
 
     (async () => {
       setLoadingUser(true);
 
       const { data: u } = await supabase.auth.getUser();
       if (!alive) return;
+
       setEmail(u.user?.email ?? null);
 
       if (u.user?.id) {
