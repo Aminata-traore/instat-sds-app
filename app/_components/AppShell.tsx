@@ -35,8 +35,12 @@ export function AppShell({ title, children }: { title: string; children: React.R
 
   useEffect(() => {
     let alive = true;
+
+    const supabase = supabaseClient(); // ✅ IMPORTANT
+
     (async () => {
       setLoadingUser(true);
+
       const { data: u } = await supabase.auth.getUser();
       if (!alive) return;
       setEmail(u.user?.email ?? null);
@@ -47,6 +51,7 @@ export function AppShell({ title, children }: { title: string; children: React.R
           .select("role")
           .eq("id", u.user.id)
           .maybeSingle();
+
         if (!alive) return;
         setRole((prof?.role ?? "agent") as Role);
       }
@@ -62,6 +67,7 @@ export function AppShell({ title, children }: { title: string; children: React.R
   const canValidate = useMemo(() => ["admin", "validateur"].includes(String(role)), [role]);
 
   const logout = async () => {
+    const supabase = supabaseClient();
     await supabase.auth.signOut();
     router.replace("/login");
   };
