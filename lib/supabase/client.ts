@@ -2,6 +2,10 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 let _supabase: SupabaseClient | null = null;
 
+/**
+ * Crée le client Supabase UNIQUEMENT côté navigateur.
+ * Empêche le crash au build/prerender (SSR) sur Vercel.
+ */
 export function supabaseClient(): SupabaseClient {
   if (typeof window === "undefined") {
     throw new Error("supabaseClient() must be called in the browser.");
