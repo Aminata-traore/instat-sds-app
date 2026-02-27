@@ -1,25 +1,21 @@
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { createBrowserClient } from "@supabase/ssr"
+import type { SupabaseClient } from "@supabase/supabase-js"
 
-let _supabase: SupabaseClient | null = null;
+let browserClient: SupabaseClient | null = null
 
-/**
- * Crée le client Supabase UNIQUEMENT côté navigateur.
- * Empêche le crash au build/prerender (SSR) sur Vercel.
- */
 export function supabaseClient(): SupabaseClient {
-  if (typeof window === "undefined") {
-    throw new Error("supabaseClient() must be called in the browser.");
+  if (browserClient) return browserClient
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error(
+      "Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY"
+    )
   }
 
-  if (_supabase) return _supabase;
+  browserClient = createBrowserClient(supabaseUrl, supabaseAnonKey)
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!url || !anon) {
-    throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY");
-  }
-
-  _supabase = createClient(url, anon);
-  return _supabase;
+  return browserClient
 }
