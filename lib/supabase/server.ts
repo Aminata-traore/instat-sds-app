@@ -13,9 +13,7 @@ export function supabaseServerClient(
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
   if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error(
-      "Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY"
-    )
+    throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY")
   }
 
   return createServerClient(supabaseUrl, supabaseAnonKey, {
@@ -23,6 +21,7 @@ export function supabaseServerClient(
       get(name: string) {
         return cookieStore.get(name)?.value
       },
+
       set(name: string, value: string, options: CookieOptions) {
         // ⚠️ Server Components: cookieStore.set peut throw (normal)
         try {
@@ -31,11 +30,15 @@ export function supabaseServerClient(
           // OK si middleware gère la session
         }
       },
+
       remove(name: string, options: CookieOptions) {
+        // ✅ force suppression
+        const opts: CookieOptions = { ...options, maxAge: 0 }
+
         try {
-          cookieStore.set({ name, value: "", ...options })
+          cookieStore.set({ name, value: "", ...opts })
         } catch {
-          // OK
+          // OK si middleware gère la session
         }
       },
     },
