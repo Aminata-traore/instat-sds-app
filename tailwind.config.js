@@ -3,12 +3,13 @@ const defaultTheme = require("tailwindcss/defaultTheme")
 
 module.exports = {
   darkMode: ["class"],
+
   content: [
     "./app/**/*.{ts,tsx}",
     "./components/**/*.{ts,tsx}",
-    "./pages/**/*.{ts,tsx}",
-    "./src/**/*.{ts,tsx}"
+    "./lib/**/*.{ts,tsx}",
   ],
+
   theme: {
     container: {
       center: true,
@@ -17,6 +18,7 @@ module.exports = {
         "2xl": "1400px",
       },
     },
+
     extend: {
       fontFamily: {
         sans: ["Inter", ...defaultTheme.fontFamily.sans],
@@ -30,7 +32,7 @@ module.exports = {
           blue: "#003366",
           lightBlue: "#0055A4",
           gold: "#C9A227",
-          gray: "#F5F7FA"
+          gray: "#F5F7FA",
         },
 
         /* Shadcn variables */
@@ -93,5 +95,6 @@ module.exports = {
       },
     },
   },
+
   plugins: [require("tailwindcss-animate")],
 }
