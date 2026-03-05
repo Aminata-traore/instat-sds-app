@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { supabaseClient } from "@/lib/supabase/client";
+import { supabase } from "@/lib/supabase/client";
 
 type Role = "admin" | "validateur" | "agent" | string;
 
@@ -13,17 +13,14 @@ function cx(...parts: Array<string | false | null | undefined>) {
 
 function NavLink({ href, label }: { href: string; label: string }) {
   const pathname = usePathname();
-  const active =
-    pathname === href || (href !== "/dashboard" && pathname.startsWith(href));
+  const active = pathname === href || (href !== "/dashboard" && pathname.startsWith(href));
 
   return (
     <Link
       href={href}
       className={cx(
         "block rounded-xl px-3 py-2 text-sm transition",
-        active
-          ? "bg-black text-white"
-          : "text-neutral-700 hover:bg-neutral-100"
+        active ? "bg-black text-white" : "text-neutral-700 hover:bg-neutral-100"
       )}
     >
       {label}
@@ -47,27 +44,38 @@ export function AppShell({
   useEffect(() => {
     let alive = true;
 
-    const supabase = supabaseClient();
-
     (async () => {
       setLoadingUser(true);
 
-      const { data: u } = await supabase.auth.getUser();
-
+      const { data, error } = await supabase.auth.getUser();
       if (!alive) return;
 
-      setEmail(u.user?.email ?? null);
+      if (error) {
+        console.error(error);
+        setEmail(null);
+        setRole("agent");
+        setLoadingUser(false);
+        return;
+      }
 
-      if (u.user?.id) {
-        const { data: prof } = await supabase
+      const user = data.user;
+      setEmail(user?.email ?? null);
+
+      if (user?.id) {
+        const { data: prof, error: profErr } = await supabase
           .from("profiles")
           .select("role")
-          .eq("id", u.user.id)
+          .eq("id", user.id)
           .maybeSingle();
 
         if (!alive) return;
 
-        setRole((prof?.role ?? "agent") as Role);
+        if (profErr) {
+          console.error(profErr);
+          setRole("agent");
+        } else {
+          setRole((prof?.role ?? "agent") as Role);
+        }
       }
 
       setLoadingUser(false);
@@ -84,10 +92,8 @@ export function AppShell({
   );
 
   const logout = async () => {
-    const supabase = supabaseClient();
     await supabase.auth.signOut();
-
-    router.replace("/login");
+    router.replace("/auth/login"); // ✅ cohérent avec ton app/auth/login
   };
 
   return (
@@ -96,9 +102,7 @@ export function AppShell({
       <header className="sticky top-0 z-10 border-b bg-white/80 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
           <div className="flex items-baseline gap-2">
-            <span className="text-lg font-extrabold tracking-tight">
-              INSTAT
-            </span>
+            <span className="text-lg font-extrabold tracking-tight">INSTAT</span>
             <span className="text-sm text-neutral-500">SDS</span>
           </div>
 
@@ -133,12 +137,16 @@ export function AppShell({
 
           <nav className="space-y-1">
             <NavLink href="/dashboard" label="Tableau de bord" />
-            <NavLink href="/fiche1/nouvelle" label="Nouvelle Fiche 1" />
-            <NavLink href="/fiche1/mes-fiches" label="Mes Fiches" />
 
-            {canValidate && (
-              <NavLink href="/admin/fiche1" label="Validation Fiche 1" />
-            )}
+            {/* ✅ Objectif: Fiche 1 dans Dashboard */}
+            <NavLink href="/dashboard/fiche1/new" label="Nouvelle Fiche 1" />
+
+            {/* ✅ Mets ce lien seulement si tu as une page dashboard/fiche1/mes-fiches
+               (sinon commente-le pour éviter un lien cassé) */}
+            <NavLink href="/dashboard/fiche1/mes-fiches" label="Mes Fiches" />
+
+            {/* ✅ Admin/validateur */}
+            {canValidate && <NavLink href="/admin" label="Espace validation" />}
           </nav>
         </aside>
 
