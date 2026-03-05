@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useEffect, useMemo, useState } from "react"
-import { LogOut, User, Settings, FileText, Home, CheckCircle2 } from "lucide-react"
+import { LogOut, User, Settings, FileText, Home, CheckCircle2, PlusCircle } from "lucide-react"
 
 import { supabaseClient } from "@/lib/supabase/client"
 import type { Profile } from "@/lib/types"
@@ -50,7 +50,6 @@ export default function Navbar() {
 
     load()
 
-    // si l’utilisateur se connecte/déconnecte, on refresh
     const { data: auth } = supabase.auth.onAuthStateChange(() => {
       load()
     })
@@ -77,7 +76,7 @@ export default function Navbar() {
       .slice(0, 2)
   }
 
-  // règles d’affichage (UI) — la vraie sécurité reste RLS + middleware
+  // UI only — sécurité réelle = RLS
   const canValidate = profile?.role === "validateur" || profile?.role === "admin"
   const isAdmin = profile?.role === "admin"
 
@@ -90,7 +89,7 @@ export default function Navbar() {
           </div>
           <div className="leading-tight">
             <div className="text-sm font-extrabold text-instat-blue">INSTAT</div>
-            <div className="text-xs text-muted-foreground">SDS — Activités</div>
+            <div className="text-xs text-muted-foreground">SDS — Fiche 1</div>
           </div>
         </Link>
 
@@ -105,7 +104,14 @@ export default function Navbar() {
               </Button>
 
               <Button asChild variant="ghost" size="sm">
-                <Link href="/fiches">
+                <Link href="/fiche1/nouvelle">
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  Nouvelle Fiche 1
+                </Link>
+              </Button>
+
+              <Button asChild variant="ghost" size="sm">
+                <Link href="/fiche1/mes-fiches">
                   <FileText className="mr-2 h-4 w-4" />
                   Mes fiches
                 </Link>
@@ -113,7 +119,7 @@ export default function Navbar() {
 
               {canValidate && (
                 <Button asChild variant="ghost" size="sm">
-                  <Link href="/validator">
+                  <Link href="/admin/fiche1">
                     <CheckCircle2 className="mr-2 h-4 w-4" />
                     Validation
                   </Link>
