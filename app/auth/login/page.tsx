@@ -30,11 +30,11 @@ export default function LoginPage() {
   const supabase = useMemo(() => supabaseClient(), [])
 
   useEffect(() => {
-    // optionnel : si déjà connecté, on peut le renvoyer
     ;(async () => {
       const { data } = await supabase.auth.getSession()
       if (data.session) {
-        router.replace("/dashboard")
+        // ✅ si déjà connecté, on envoie vers la saisie (objectif projet)
+        router.replace("/fiche1/nouvelle")
       }
     })()
   }, [router, supabase])
@@ -42,7 +42,7 @@ export default function LoginPage() {
   const goByRole = async () => {
     const { data: u } = await supabase.auth.getUser()
     const uid = u.user?.id
-    if (!uid) return router.push("/dashboard")
+    if (!uid) return router.push("/fiche1/nouvelle")
 
     const { data: p } = await supabase
       .from("profiles")
@@ -52,10 +52,13 @@ export default function LoginPage() {
 
     const role = p?.role
 
+    // ✅ si on a un redirectTo (cas "page protégée"), on respecte
     if (redirectTo) return router.push(redirectTo)
+
+    // ✅ redirections alignées objectif Fiche 1
     if (role === "admin") return router.push("/admin")
-    if (role === "validateur") return router.push("/validator")
-    return router.push("/dashboard")
+    if (role === "validateur") return router.push("/admin/fiche1")
+    return router.push("/fiche1/nouvelle")
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -72,6 +75,7 @@ export default function LoginPage() {
     }
 
     await goByRole()
+    setLoading(false)
   }
 
   return (
@@ -120,7 +124,10 @@ export default function LoginPage() {
         <CardFooter className="justify-center">
           <p className="text-sm text-muted-foreground">
             Pas encore de compte ?{" "}
-            <Link href="/auth/register" className="text-instat-lightBlue hover:underline">
+            <Link
+              href="/auth/register"
+              className="text-instat-lightBlue hover:underline"
+            >
               S&apos;inscrire
             </Link>
           </p>
