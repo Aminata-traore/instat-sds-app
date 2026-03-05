@@ -1,7 +1,7 @@
 import { createBrowserClient } from "@supabase/ssr"
 import type { SupabaseClient } from "@supabase/supabase-js"
 
-let browserClient: SupabaseClient | null = null
+let browserClient: SupabaseClient | undefined
 
 export function supabaseClient(): SupabaseClient {
   if (browserClient) return browserClient
@@ -11,7 +11,7 @@ export function supabaseClient(): SupabaseClient {
 
   if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error(
-      "Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY"
+      "Supabase environment variables are missing. Check NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY."
     )
   }
 
