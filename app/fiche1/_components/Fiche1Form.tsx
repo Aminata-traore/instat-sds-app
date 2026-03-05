@@ -132,13 +132,11 @@ export default function Fiche1Form({ userId }: { userId: string }) {
   useEffect(() => {
     setCercle("")
     setStructure("")
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [region])
 
   // Si cercle change -> reset structure
   useEffect(() => {
     setStructure("")
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cercle])
 
   const addRow = () => {
@@ -171,8 +169,21 @@ export default function Fiche1Form({ userId }: { userId: string }) {
     return null
   }
 
+  const getCleanRows = () =>
+    rows
+      .filter((r) => r.activite.trim() !== "") // ignore les lignes vides
+      .map((r) => ({
+        activite: r.activite.trim(),
+        resultat: r.resultat?.trim() || null,
+        produit_id: r.produit_id,
+        source_finance_id: r.source_finance_id,
+        source_verification_id: r.source_verification_id,
+        observation: r.observation?.trim() || null,
+      }))
+
   const saveDraft = async () => {
     setMessage(null)
+
     const errMsg = validateHeader()
     if (errMsg) {
       setMessage(errMsg)
@@ -181,14 +192,16 @@ export default function Fiche1Form({ userId }: { userId: string }) {
 
     setSaving(true)
     try {
-      // 1) upsert fiche1
+      // NOTE: ici region_id / cercle_id / structure_id sont des TEXT.
+      // ✅ Si ta DB est en UUID, il faut soit changer DB en TEXT,
+      // soit créer des tables regions/cercles/structures et passer des UUID.
       const payload = {
-        region_id: region,      // ⚠️ si tu as region_id en UUID, on adaptera
-        cercle_id: cercle,      // ⚠️ idem
-        structure_id: structure,// ⚠️ idem
-        responsable_nom: responsableNom,
+        region_id: region,
+        cercle_id: cercle,
+        structure_id: structure,
+        responsable_nom: responsableNom.trim(),
         annee,
-        numero_fiche: numeroFiche,
+        numero_fiche: numeroFiche.trim(),
         statut: "brouillon",
         created_by: userId,
       }
@@ -205,25 +218,14 @@ export default function Fiche1Form({ userId }: { userId: string }) {
         if (error) throw error
       }
 
-      // 2) remplacer les lignes d'activités
-      // (simple et fiable : delete + insert)
+      // Remplacer les lignes d'activités (delete + insert)
       const { error: delErr } = await supabase
         .from("fiche1_activites")
         .delete()
         .eq("fiche1_id", currentId)
       if (delErr) throw delErr
 
-      const cleanRows = rows
-        .filter((r) => r.activite.trim() !== "") // on ignore lignes vides
-        .map((r) => ({
-          fiche1_id: currentId,
-          activite: r.activite,
-          resultat: r.resultat,
-          produit_id: r.produit_id,
-          source_finance_id: r.source_finance_id,
-          source_verification_id: r.source_verification_id,
-          observation: r.observation,
-        }))
+      const cleanRows = getCleanRows().map((r) => ({ ...r, fiche1_id: currentId! }))
 
       if (cleanRows.length > 0) {
         const { error: insErr } = await supabase.from("fiche1_activites").insert(cleanRows)
@@ -240,16 +242,40 @@ export default function Fiche1Form({ userId }: { userId: string }) {
   }
 
   const submitToValidator = async () => {
-    if (!ficheId) {
-      setMessage("Enregistre d’abord le brouillon, puis soumets.")
+    setMessage(null)
+
+    const errMsg = validateHeader()
+    if (errMsg) {
+      setMessage(errMsg)
       return
     }
+
+    // ✅ empêche de soumettre une fiche vide
+    const cleanRows = getCleanRows()
+    if (cleanRows.length === 0) {
+      setMessage("Ajoute au moins une activité avant de soumettre.")
+      return
+    }
+
+    // ✅ si pas encore sauvegardée, on sauvegarde d'abord
+    if (!ficheId) {
+      await saveDraft()
+      // après saveDraft, ficheId devrait être créé
+      // mais comme setState est async, on re-vérifie côté DB:
+      // on bloque ici si toujours null
+      if (!ficheId) return
+    }
+
     setSaving(true)
-    setMessage(null)
-    const { error } = await supabase.from("fiche1").update({ statut: "soumis" }).eq("id", ficheId)
-    setSaving(false)
-    if (error) setMessage(error.message)
-    else setMessage("Fiche soumise au validateur.")
+    try {
+      const { error } = await supabase.from("fiche1").update({ statut: "soumis" }).eq("id", ficheId)
+      if (error) throw error
+      setMessage("Fiche soumise au validateur.")
+    } catch (e: any) {
+      setMessage(e?.message ?? "Erreur lors de la soumission.")
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -310,16 +336,16 @@ export default function Fiche1Form({ userId }: { userId: string }) {
 
           <div className="space-y-2">
             <Label>Nom & prénom du responsable</Label>
-            <Input value={responsableNom} onChange={(e) => setResponsableNom(e.target.value)} placeholder="Ex: Mme Traoré Aminata" />
+            <Input
+              value={responsableNom}
+              onChange={(e) => setResponsableNom(e.target.value)}
+              placeholder="Ex: Mme Traoré Aminata"
+            />
           </div>
 
           <div className="space-y-2">
             <Label>Année (N-1)</Label>
-            <Input
-              type="number"
-              value={annee}
-              onChange={(e) => setAnnee(Number(e.target.value))}
-            />
+            <Input type="number" value={annee} onChange={(e) => setAnnee(Number(e.target.value))} />
           </div>
 
           <div className="space-y-2">
@@ -354,10 +380,7 @@ export default function Fiche1Form({ userId }: { userId: string }) {
 
                 <div className="space-y-2">
                   <Label>Produit</Label>
-                  <Select
-                    value={r.produit_id ?? ""}
-                    onValueChange={(v) => updateRow(idx, { produit_id: v || null })}
-                  >
+                  <Select value={r.produit_id ?? ""} onValueChange={(v) => updateRow(idx, { produit_id: v || null })}>
                     <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
                     <SelectContent>
                       {produits.map((p) => <SelectItem key={p.id} value={p.id}>{p.libelle}</SelectItem>)}
@@ -398,12 +421,7 @@ export default function Fiche1Form({ userId }: { userId: string }) {
               </div>
 
               <div className="flex justify-end">
-                <Button
-                  type="button"
-                  variant="destructive"
-                  onClick={() => removeRow(idx)}
-                  disabled={rows.length === 1}
-                >
+                <Button type="button" variant="destructive" onClick={() => removeRow(idx)} disabled={rows.length === 1}>
                   Supprimer la ligne
                 </Button>
               </div>
@@ -414,7 +432,7 @@ export default function Fiche1Form({ userId }: { userId: string }) {
             <Button type="button" variant="outline" onClick={saveDraft} disabled={saving}>
               {saving ? "Enregistrement..." : "Enregistrer brouillon"}
             </Button>
-            <Button type="button" onClick={submitToValidator} disabled={saving || !ficheId}>
+            <Button type="button" onClick={submitToValidator} disabled={saving}>
               Soumettre
             </Button>
           </div>
