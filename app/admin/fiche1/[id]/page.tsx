@@ -2,34 +2,70 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { supabaseClient } from "@/lib/supabase/client";
+import { supabase } from "@/lib/supabase/client";
 import { useRequireAuth } from "@/lib/auth/requireAuth";
 
 type ValidationStatus = "valide" | "rejete";
 
-type Fiche1 = {
+type Fiche1Row = {
   id: string;
-  region_id: string;
-  cercle_id: string;
-  structure_id: string;
-  responsable_nom: string;
-  annee: number;
-  numero_fiche: string;
-  statut: "brouillon" | "soumis" | "valide" | "rejete";
-  created_by: string | null;
-  created_at: string | null;
+  statut?: string | null; // "brouillon" | "soumis" | "valide" | "rejete"
+  status?: string | null; // au cas où ta colonne s'appelle status
+  created_by?: string | null;
+  created_at?: string | null;
 };
 
-type Fiche1Activite = {
-  id: string;
-  fiche1_id: string;
-  activite: string;
-  resultat: string | null;
-  produit_id: string | null;
-  source_finance_id: string | null;
-  source_verification_id: string | null;
-  observation: string | null;
+type Question = {
+  code: string;
+  label: string;
+  section: string;
+  order_index: number;
+  field_type: string;
 };
+
+type Answer = {
+  question_code: string;
+  value_text: string | null;
+  value_number: number | null;
+  value_bool: boolean | null;
+  value_json: any | null;
+};
+
+function sectionTitle(section: string) {
+  if (section === "section1") return "Section 1 — Identification";
+  if (section === "section2") return "Section 2 — Caractéristiques";
+  if (section === "section3") return "Section 3 — Réalisation / Exécution";
+  if (section === "section4") return "Section 4 — Financement";
+  if (section === "section5") return "Section 5 — Informations de remplissage";
+  return section;
+}
+
+function formatAnswer(q: Question, a?: Answer) {
+  if (!a) return "-";
+
+  // priorité par type
+  if (q.field_type === "yesno" || q.field_type === "checkbox") {
+    if (a.value_bool === null) return "-";
+    return a.value_bool ? "Oui" : "Non";
+  }
+
+  if (q.field_type === "number") {
+    return a.value_number ?? "-";
+  }
+
+  if (q.field_type === "multiselect") {
+    if (!a.value_json) return "-";
+    try {
+      if (Array.isArray(a.value_json)) return a.value_json.join(", ");
+      return JSON.stringify(a.value_json);
+    } catch {
+      return String(a.value_json);
+    }
+  }
+
+  // text/date/select/etc.
+  return a.value_text ?? "-";
+}
 
 export default function AdminFiche1DetailPage() {
   const { loading } = useRequireAuth();
@@ -39,10 +75,12 @@ export default function AdminFiche1DetailPage() {
   const id = useMemo(() => String((params as any)?.id ?? ""), [params]);
 
   const [role, setRole] = useState<string | null>(null);
-  const [fiche, setFiche] = useState<Fiche1 | null>(null);
-  const [activites, setActivites] = useState<Fiche1Activite[]>([]);
-  const [comment, setComment] = useState("");
+  const [fiche, setFiche] = useState<Fiche1Row | null>(null);
 
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [answers, setAnswers] = useState<Record<string, Answer>>({});
+
+  const [comment, setComment] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -53,8 +91,6 @@ export default function AdminFiche1DetailPage() {
       setError(null);
 
       try {
-        const supabase = supabaseClient();
-
         // 1) user + role
         const { data: u, error: eUser } = await supabase.auth.getUser();
         if (eUser) throw new Error(eUser.message);
@@ -75,31 +111,46 @@ export default function AdminFiche1DetailPage() {
         setRole(r);
 
         if (!["admin", "validateur"].includes(r)) {
-          setError("Accès refusé: vous n’êtes pas validateur/admin.");
+          setError("Accès refusé : vous n’êtes pas validateur/admin.");
           return;
         }
 
         // 2) charger fiche1 (entête)
         const { data: f, error: eF } = await supabase
           .from("fiche1")
-          .select("*")
+          .select("id, statut, status, created_by, created_at")
           .eq("id", id)
           .single();
 
         if (!alive) return;
         if (eF) throw new Error(eF.message);
-        setFiche(f as Fiche1);
+        setFiche(f as Fiche1Row);
 
-        // 3) charger les activités liées
-        const { data: acts, error: eA } = await supabase
-          .from("fiche1_activites")
-          .select("*")
-          .eq("fiche1_id", id)
-          .order("id", { ascending: true });
+        // 3) charger questions (pour afficher par section)
+        const { data: qs, error: eQ } = await supabase
+          .from("fiche1_questions")
+          .select("code,label,section,order_index,field_type")
+          .order("section", { ascending: true })
+          .order("order_index", { ascending: true });
+
+        if (!alive) return;
+        if (eQ) throw new Error(eQ.message);
+        setQuestions((qs ?? []) as Question[]);
+
+        // 4) charger réponses
+        const { data: ans, error: eA } = await supabase
+          .from("answers_fiche1")
+          .select("question_code,value_text,value_number,value_bool,value_json")
+          .eq("fiche1_id", id);
 
         if (!alive) return;
         if (eA) throw new Error(eA.message);
-        setActivites((acts ?? []) as Fiche1Activite[]);
+
+        const map: Record<string, Answer> = {};
+        for (const row of ans ?? []) {
+          map[(row as any).question_code] = row as any;
+        }
+        setAnswers(map);
       } catch (e: any) {
         if (!alive) return;
         setError(e?.message ?? "Erreur inconnue");
@@ -111,36 +162,57 @@ export default function AdminFiche1DetailPage() {
     };
   }, [id]);
 
+  const grouped = useMemo(() => {
+    const m = new Map<string, Question[]>();
+    for (const q of questions) {
+      const arr = m.get(q.section) ?? [];
+      arr.push(q);
+      m.set(q.section, arr);
+    }
+    return Array.from(m.entries());
+  }, [questions]);
+
+  const currentStatus =
+    fiche?.statut ?? fiche?.status ?? "-";
+
   const setStatus = async (statut: ValidationStatus) => {
     setError(null);
     setBusy(true);
 
     try {
-      const supabase = supabaseClient();
-
       const { data: u, error: eUser } = await supabase.auth.getUser();
       if (eUser) throw new Error(eUser.message);
 
       const uid = u.user?.id;
       if (!uid) throw new Error("Utilisateur non connecté");
 
-      // IMPORTANT:
-      // Ici, on se limite à mettre à jour le statut de la fiche.
-      // Si tu veux enregistrer le commentaire en base, on peut ajouter une table fiche1_validations.
-      const { error: eUpd } = await supabase
+      // On met à jour statut OU status selon ce qui existe
+      // (si ta colonne est 'statut', status sera ignorée, et inversement)
+      const payload: any = { statut };
+      // si ta table utilise "status" au lieu de "statut", remplace par { status: statut }
+      // ou garde les deux (le champ inexistant sera rejeté) => donc on fait 2 tentatives.
+
+      // tentative 1: statut
+      let { error: eUpd } = await supabase
         .from("fiche1")
-        .update({
-          statut: statut,
-          // optionnel: si tu ajoutes ces colonnes plus tard:
-          // validated_at: new Date().toISOString(),
-          // validated_by: uid,
-          // validation_comment: comment.trim() || null,
-        })
+        .update({ statut })
         .eq("id", id);
+
+      // si erreur colonne statut, tentative 2 : status
+      if (eUpd && String(eUpd.message).toLowerCase().includes("column")) {
+        const r2 = await supabase
+          .from("fiche1")
+          .update({ status: statut })
+          .eq("id", id);
+        eUpd = r2.error ?? null;
+      }
 
       if (eUpd) throw new Error(eUpd.message);
 
-      router.push("/admin/fiche1");
+      // (Optionnel plus tard) enregistrer le commentaire dans une table fiche1_validations
+      // Pour l’instant on ne le persiste pas.
+
+      router.push("/admin");
     } catch (e: any) {
       setError(e?.message ?? "Erreur inconnue");
     } finally {
@@ -148,142 +220,73 @@ export default function AdminFiche1DetailPage() {
     }
   };
 
-  if (loading) return <main style={{ padding: 24 }}>Chargement...</main>;
+  if (loading) return <main className="p-6">Chargement...</main>;
 
   return (
-    <main style={{ padding: 24, maxWidth: 1100 }}>
-      <h1 style={{ fontSize: 22, fontWeight: 800 }}>Validation — Fiche 1</h1>
-      <p style={{ marginTop: 6, opacity: 0.7 }}>Rôle: {role ?? "-"}</p>
+    <main className="p-6 max-w-5xl">
+      <h1 className="text-2xl font-extrabold">Validation — Fiche 1</h1>
+      <p className="mt-2 text-sm text-neutral-600">Rôle : {role ?? "-"}</p>
 
-      {error && <p style={{ marginTop: 12, color: "crimson" }}>{error}</p>}
+      {error && <p className="mt-4 text-red-600 font-semibold">{error}</p>}
 
       {!fiche ? (
-        <p style={{ marginTop: 12 }}>Chargement fiche…</p>
+        <p className="mt-4">Chargement fiche…</p>
       ) : (
         <>
-          {/* Résumé fiche */}
-          <div
-            style={{
-              marginTop: 14,
-              padding: 14,
-              border: "1px solid #e5e7eb",
-              borderRadius: 10,
-            }}
-          >
-            <h2 style={{ fontSize: 18, fontWeight: 700 }}>Section 1 — Identification</h2>
+          {/* ENTETE */}
+          <div className="mt-4 rounded-xl border bg-white p-4 space-y-1">
+            <h2 className="text-lg font-bold">Résumé</h2>
             <p>Date: {fiche.created_at ? new Date(fiche.created_at).toLocaleString() : "-"}</p>
-            <p>Région: {fiche.region_id ?? "-"}</p>
-            <p>Cercle: {fiche.cercle_id ?? "-"}</p>
-            <p>Structure: {fiche.structure_id ?? "-"}</p>
-            <p>Responsable: {fiche.responsable_nom ?? "-"}</p>
-            <p>Année (N-1): {fiche.annee ?? "-"}</p>
-            <p>N° fiche: {fiche.numero_fiche ?? "-"}</p>
-            <p>Statut: {fiche.statut ?? "-"}</p>
+            <p>ID fiche: {fiche.id}</p>
+            <p>Créée par: {fiche.created_by ?? "-"}</p>
+            <p>Statut: {String(currentStatus)}</p>
           </div>
 
-          {/* Activités */}
-          <div
-            style={{
-              marginTop: 14,
-              padding: 14,
-              border: "1px solid #e5e7eb",
-              borderRadius: 10,
-            }}
-          >
-            <h2 style={{ fontSize: 18, fontWeight: 700 }}>Section 2 — Activités</h2>
+          {/* REPONSES */}
+          <div className="mt-4 space-y-4">
+            {grouped.map(([section, qs]) => (
+              <div key={section} className="rounded-xl border bg-white p-4">
+                <h2 className="text-lg font-bold">{sectionTitle(section)}</h2>
 
-            {activites.length === 0 ? (
-              <p style={{ marginTop: 8, opacity: 0.7 }}>Aucune activité enregistrée.</p>
-            ) : (
-              <div style={{ overflowX: "auto", marginTop: 10 }}>
-                <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                  <thead>
-                    <tr>
-                      {[
-                        "Activité",
-                        "Résultat attendu",
-                        "Produit",
-                        "Source financement",
-                        "Vérification",
-                        "Observations",
-                      ].map((h) => (
-                        <th
-                          key={h}
-                          style={{
-                            textAlign: "left",
-                            padding: 10,
-                            borderBottom: "1px solid #e5e7eb",
-                            fontSize: 13,
-                            color: "#111827",
-                          }}
-                        >
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {activites.map((a) => (
-                      <tr key={a.id}>
-                        <td style={{ padding: 10, borderBottom: "1px solid #f3f4f6" }}>
-                          {a.activite}
-                        </td>
-                        <td style={{ padding: 10, borderBottom: "1px solid #f3f4f6" }}>
-                          {a.resultat ?? "-"}
-                        </td>
-                        <td style={{ padding: 10, borderBottom: "1px solid #f3f4f6" }}>
-                          {a.produit_id ?? "-"}
-                        </td>
-                        <td style={{ padding: 10, borderBottom: "1px solid #f3f4f6" }}>
-                          {a.source_finance_id ?? "-"}
-                        </td>
-                        <td style={{ padding: 10, borderBottom: "1px solid #f3f4f6" }}>
-                          {a.source_verification_id ?? "-"}
-                        </td>
-                        <td style={{ padding: 10, borderBottom: "1px solid #f3f4f6" }}>
-                          {a.observation ?? "-"}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <div className="mt-3 grid gap-2">
+                  {qs.map((q) => (
+                    <div
+                      key={q.code}
+                      className="grid grid-cols-1 md:grid-cols-[260px_1fr] gap-2 border-b last:border-b-0 py-2"
+                    >
+                      <div className="text-sm font-semibold">
+                        {q.code} — {q.label}
+                      </div>
+                      <div className="text-sm text-neutral-800">
+                        {formatAnswer(q, answers[q.code])}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
-            )}
+            ))}
           </div>
 
-          {/* Commentaire */}
-          <div style={{ marginTop: 14 }}>
-            <label style={{ fontWeight: 700 }}>Commentaire (optionnel)</label>
+          {/* COMMENTAIRE (non persisté pour l’instant) */}
+          <div className="mt-4">
+            <label className="font-bold">Commentaire (optionnel)</label>
             <textarea
               value={comment}
               onChange={(e) => setComment(e.target.value)}
-              style={{
-                width: "100%",
-                height: 90,
-                marginTop: 8,
-                border: "1px solid #e5e7eb",
-                borderRadius: 8,
-                padding: 10,
-              }}
+              className="mt-2 w-full h-24 border rounded-lg p-3"
               placeholder="Ex: champ manquant, incohérence, correction…"
             />
-            <p style={{ marginTop: 6, fontSize: 12, opacity: 0.7 }}>
-              (Pour enregistrer ce commentaire en base, on ajoutera une table dédiée aux validations.)
+            <p className="mt-1 text-xs text-neutral-500">
+              (Pour enregistrer ce commentaire, on ajoutera une table dédiée aux validations.)
             </p>
           </div>
 
-          {/* Actions */}
-          <div style={{ marginTop: 12, display: "flex", gap: 10 }}>
+          {/* ACTIONS */}
+          <div className="mt-4 flex gap-3">
             <button
               disabled={busy}
               onClick={() => setStatus("valide")}
-              style={{
-                padding: 10,
-                borderRadius: 10,
-                border: "1px solid #e5e7eb",
-                background: "white",
-                fontWeight: 700,
-              }}
+              className="px-4 py-2 rounded-lg border bg-white font-bold"
             >
               {busy ? "..." : "✅ Valider"}
             </button>
@@ -291,13 +294,7 @@ export default function AdminFiche1DetailPage() {
             <button
               disabled={busy}
               onClick={() => setStatus("rejete")}
-              style={{
-                padding: 10,
-                borderRadius: 10,
-                border: "1px solid #e5e7eb",
-                background: "white",
-                fontWeight: 700,
-              }}
+              className="px-4 py-2 rounded-lg border bg-white font-bold"
             >
               {busy ? "..." : "❌ Rejeter"}
             </button>
