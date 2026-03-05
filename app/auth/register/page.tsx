@@ -32,7 +32,7 @@ export default function RegisterPage() {
     setLoading(true)
     setError("")
 
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -46,7 +46,26 @@ export default function RegisterPage() {
       return
     }
 
-    router.push("/auth/login?message=Compte créé. Vérifiez votre email si la confirmation est activée.")
+    // ✅ Si session dispo tout de suite, on crée le profil (sinon, il sera créé côté DB via trigger si tu en as un)
+    const uid = data.user?.id
+
+    if (uid) {
+      // On tente upsert (si déjà créé par trigger -> pas d'erreur)
+      const { error: profErr } = await supabase.from("profiles").upsert({
+        id: uid,
+        full_name: fullName,
+        role: "agent",
+      })
+
+      // On ne bloque pas l'utilisateur si ça échoue (selon ta config RLS)
+      if (profErr) {
+        console.warn("profiles upsert error:", profErr.message)
+      }
+    }
+
+    // ✅ Pour rester aligné projet: retour login (ou direct saisie si email confirmation off)
+    router.push("/auth/login?message=Compte créé. Connectez-vous pour saisir la Fiche 1.")
+    setLoading(false)
   }
 
   return (
