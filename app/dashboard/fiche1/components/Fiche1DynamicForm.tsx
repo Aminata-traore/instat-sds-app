@@ -29,7 +29,6 @@ type Question = {
 };
 
 type RefOption = { value: string | number; label: string };
-
 type AnswerState = Record<string, any>;
 
 function sectionTitle(section: string) {
@@ -39,6 +38,24 @@ function sectionTitle(section: string) {
   if (section === "section4") return "Section 4 — Financement";
   if (section === "section5") return "Section 5 — Informations de remplissage";
   return section;
+}
+
+function toBool(v: any): boolean {
+  if (v === true) return true;
+  if (v === false) return false;
+  if (v === 1 || v === "1") return true;
+  if (v === 0 || v === "0") return false;
+  const s = String(v ?? "").trim().toLowerCase();
+  if (s === "true" || s === "oui" || s === "yes") return true;
+  if (s === "false" || s === "non" || s === "no") return false;
+  return Boolean(v);
+}
+
+function smartCastSelectValue(raw: string) {
+  // si c'est un nombre, on cast en number
+  if (raw === "") return "";
+  const n = Number(raw);
+  return Number.isFinite(n) && String(n) === raw ? n : raw;
 }
 
 export default function Fiche1DynamicForm() {
@@ -51,7 +68,7 @@ export default function Fiche1DynamicForm() {
     {}
   );
 
-  const selectedRegionId = answers["1.01"]; // region id (ref_regions.id)
+  const selectedRegionId = answers["1.01"] || ""; // region id (ref_regions.id)
 
   const sections = useMemo(() => {
     const map = new Map<string, Question[]>();
@@ -67,9 +84,11 @@ export default function Fiche1DynamicForm() {
     return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
   }, [questions]);
 
+  // Charger les questions
   useEffect(() => {
-    const loadQuestions = async () => {
+    (async () => {
       setLoading(true);
+
       const { data, error } = await supabase
         .from("fiche1_questions")
         .select(
@@ -87,9 +106,7 @@ export default function Fiche1DynamicForm() {
 
       setQuestions((data as Question[]) ?? []);
       setLoading(false);
-    };
-
-    loadQuestions();
+    })();
   }, []);
 
   const getOptions = async (q: Question): Promise<RefOption[]> => {
@@ -106,7 +123,7 @@ export default function Fiche1DynamicForm() {
     const valueField = q.ref_value_field || "id";
     const labelField = q.ref_label_field || "label";
 
-    // cercle depends on region
+    // cercle dépend de la région
     let cacheKey = q.ref_table;
     if (q.code === "1.02") {
       cacheKey = `${q.ref_table}|region=${selectedRegionId || "none"}`;
@@ -138,8 +155,9 @@ export default function Fiche1DynamicForm() {
     return opts;
   };
 
+  // Prefetch options
   useEffect(() => {
-    const prefetch = async () => {
+    (async () => {
       if (!questions.length) return;
 
       for (const q of questions) {
@@ -148,14 +166,13 @@ export default function Fiche1DynamicForm() {
           await getOptions(q);
         }
       }
-    };
-    prefetch();
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [questions, selectedRegionId]);
 
   const setAnswer = (code: string, value: any) => {
     if (code === "1.01") {
-      // reset cercle when region changes
+      // reset cercle quand région change
       setAnswers((prev) => ({ ...prev, ["1.01"]: value, ["1.02"]: "" }));
       return;
     }
@@ -182,7 +199,7 @@ export default function Fiche1DynamicForm() {
 
       if (q.field_type === "number") row.value_number = Number(v);
       else if (q.field_type === "yesno" || q.field_type === "checkbox")
-        row.value_bool = Boolean(v);
+        row.value_bool = toBool(v);
       else if (q.field_type === "multiselect") row.value_json = v;
       else row.value_text = String(v);
 
@@ -192,27 +209,41 @@ export default function Fiche1DynamicForm() {
     return rows;
   };
 
-  const createFicheAndSave = async () => {
+  const createFiche = async (statut: "brouillon" | "soumis") => {
+    // récupérer user id
+    const { data: u } = await supabase.auth.getUser();
+    const uid = u.user?.id ?? null;
+
+    // tentative 1: colonne "statut"
+    let res = await supabase
+      .from("fiche1")
+      .insert([{ statut, created_by: uid }])
+      .select("id")
+      .single();
+
+    if (!res.error && res.data?.id) return String(res.data.id);
+
+    // fallback: si la colonne s'appelle "status"
+    const res2 = await supabase
+      .from("fiche1")
+      .insert([{ status: statut, created_by: uid } as any])
+      .select("id")
+      .single();
+
+    if (res2.error) {
+      console.error(res.error, res2.error);
+      throw new Error(
+        "Erreur création fiche1. Vérifie les colonnes obligatoires (NOT NULL) et si la colonne statut s'appelle statut ou status."
+      );
+    }
+
+    return String(res2.data.id);
+  };
+
+  const saveFiche = async (mode: "brouillon" | "soumis") => {
     setSaving(true);
     try {
-      // IMPORTANT :
-      // Ta table fiche1 doit accepter cet insert.
-      // Si elle exige d'autres colonnes NOT NULL, ajoute-les ici.
-      const { data: ficheData, error: ficheErr } = await supabase
-        .from("fiche1")
-        .insert([{ statut: "brouillon" }])
-        .select("id")
-        .single();
-
-      if (ficheErr) {
-        console.error(ficheErr);
-        alert(
-          "Erreur création fiche1. Vérifie les colonnes obligatoires (NOT NULL) dans la table fiche1."
-        );
-        return;
-      }
-
-      const fiche1Id = ficheData.id as string;
+      const fiche1Id = await createFiche(mode);
 
       const rows = buildAnswerRows(fiche1Id);
 
@@ -228,15 +259,19 @@ export default function Fiche1DynamicForm() {
         return;
       }
 
-      alert("✅ Fiche 1 enregistrée (brouillon).");
+      alert(mode === "soumis" ? "✅ Fiche 1 soumise pour validation." : "✅ Fiche 1 enregistrée (brouillon).");
+
+      // (Optionnel) vider le formulaire après succès
+      setAnswers({});
+    } catch (e: any) {
+      alert(e?.message ?? "Erreur inconnue");
     } finally {
       setSaving(false);
     }
   };
 
   const renderField = (q: Question) => {
-    const value =
-      answers[q.code] ?? (q.field_type === "multiselect" ? [] : "");
+    const value = answers[q.code] ?? (q.field_type === "multiselect" ? [] : "");
 
     if (q.field_type === "yesno") {
       const boolVal =
@@ -305,7 +340,7 @@ export default function Fiche1DynamicForm() {
           className="w-full border rounded px-3 py-2"
           value={value}
           disabled={q.code === "1.02" && !selectedRegionId}
-          onChange={(e) => setAnswer(q.code, e.target.value)}
+          onChange={(e) => setAnswer(q.code, smartCastSelectValue(e.target.value))}
         >
           <option value="">
             {q.code === "1.02" && !selectedRegionId
@@ -313,7 +348,7 @@ export default function Fiche1DynamicForm() {
               : "-- Choisir --"}
           </option>
           {opts.map((o) => (
-            <option key={`${o.value}`} value={o.value}>
+            <option key={`${o.value}`} value={String(o.value)}>
               {o.label}
             </option>
           ))}
@@ -327,7 +362,7 @@ export default function Fiche1DynamicForm() {
 
       const arr: any[] = Array.isArray(value) ? value : [];
 
-      // Si pas d'options (pas encore branché), on laisse une saisie JSON
+      // fallback JSON
       if (!opts.length) {
         return (
           <textarea
@@ -348,22 +383,15 @@ export default function Fiche1DynamicForm() {
       return (
         <div className="border rounded p-3 space-y-2">
           {opts.map((o) => {
-            const checked =
-              arr.includes(o.value) || arr.includes(String(o.value));
+            const checked = arr.includes(o.value) || arr.includes(String(o.value));
             return (
               <label key={`${o.value}`} className="flex items-center gap-2">
                 <input
                   type="checkbox"
                   checked={checked}
                   onChange={(e) => {
-                    if (e.target.checked) {
-                      setAnswer(q.code, [...arr, o.value]);
-                    } else {
-                      setAnswer(
-                        q.code,
-                        arr.filter((x) => String(x) !== String(o.value))
-                      );
-                    }
+                    if (e.target.checked) setAnswer(q.code, [...arr, o.value]);
+                    else setAnswer(q.code, arr.filter((x) => String(x) !== String(o.value)));
                   }}
                 />
                 {o.label}
@@ -374,11 +402,7 @@ export default function Fiche1DynamicForm() {
       );
     }
 
-    return (
-      <div className="text-sm text-red-600">
-        Champ non supporté: {q.field_type}
-      </div>
-    );
+    return <div className="text-sm text-red-600">Champ non supporté: {q.field_type}</div>;
   };
 
   if (loading) return <div className="p-6">Chargement du formulaire…</div>;
@@ -408,14 +432,25 @@ export default function Fiche1DynamicForm() {
         </div>
       ))}
 
-      <button
-        type="button"
-        className="px-4 py-2 rounded bg-black text-white disabled:opacity-60"
-        disabled={saving}
-        onClick={createFicheAndSave}
-      >
-        {saving ? "Enregistrement…" : "Enregistrer (brouillon)"}
-      </button>
+      <div className="flex flex-col sm:flex-row gap-3">
+        <button
+          type="button"
+          className="px-4 py-2 rounded border bg-white font-semibold disabled:opacity-60"
+          disabled={saving}
+          onClick={() => saveFiche("brouillon")}
+        >
+          {saving ? "Enregistrement…" : "Enregistrer (brouillon)"}
+        </button>
+
+        <button
+          type="button"
+          className="px-4 py-2 rounded bg-black text-white font-semibold disabled:opacity-60"
+          disabled={saving}
+          onClick={() => saveFiche("soumis")}
+        >
+          {saving ? "Soumission…" : "Soumettre pour validation"}
+        </button>
+      </div>
     </div>
   );
 }
