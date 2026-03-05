@@ -14,28 +14,46 @@ export type Profile = {
 }
 
 /* =========================
-   FICHE 1 TYPES
+   FICHE 1 (NOUVEAU MODELE)
+   - table: fiche1 (entête)
+   - table: fiche1_activites (lignes)
 ========================= */
 
 export type FicheStatut = "brouillon" | "soumis"
-export type ValidationStatut = "valide" | "rejete" | null
-
-export type Fiche1Data = Record<string, unknown> // JSONB sécurisé
 
 export type Fiche1 = {
   id: string
-  user_id: string
-  titre: string
-  annee: number | null
-  numero_fiche: string | null
+  region_id: string
+  cercle_id: string
+  structure_id: string
+  responsable_nom: string
+  annee: number
+  numero_fiche: string
   statut: FicheStatut
-  statut_validation: ValidationStatut
-  validation_comment: string | null
-  validated_at: string | null
-  validated_by: string | null
+  created_by: string
   created_at: string
-  updated_at: string
-  data: Fiche1Data
+  updated_at: string | null
+}
+
+export type Fiche1Activite = {
+  id: string
+  fiche1_id: string
+  activite: string
+  resultat: string
+  produit_id: string | null
+  source_finance_id: string | null
+  source_verification_id: string | null
+  observation: string | null
+  created_at: string
+}
+
+/* =========================
+   REFERENTIELS (OPTIONS)
+========================= */
+
+export type RefOption = {
+  id: string
+  libelle: string
 }
 
 /* =========================
