@@ -13,13 +13,13 @@ export default async function MesFichesPage() {
   if (!session) redirect("/auth/login")
 
   const { data: fiches, error } = await supabase
-    .from("fiche1")
-    .select("id, numero_fiche, annee, statut, created_at")
-    .eq("created_by", session.user.id)
+    .from("answers_fiche1")
+    .select("id, titre, numero_fiche, annee, statut, statut_validation, created_at")
+    .eq("user_id", session.user.id)
     .order("created_at", { ascending: false })
 
   if (error) {
-    return <div className="p-6">Erreur: {error.message}</div>
+    return <div className="p-6">Erreur : {error.message}</div>
   }
 
   return (
@@ -30,21 +30,27 @@ export default async function MesFichesPage() {
         {fiches?.map((f) => (
           <div
             key={f.id}
-            className="flex items-center justify-between border rounded-lg p-4"
+            className="flex items-center justify-between border rounded-lg p-4 bg-white"
           >
             <div>
               <div className="font-semibold">
-                {f.numero_fiche || f.id}
+                {f.titre || f.numero_fiche || f.id}
               </div>
 
               <div className="text-sm text-gray-500">
-                Année: {f.annee} • Statut: {f.statut}
+                Année : {f.annee ?? "-"} • Statut : {f.statut}
               </div>
+
+              {f.statut_validation && (
+                <div className="text-xs text-gray-400">
+                  Validation : {f.statut_validation}
+                </div>
+              )}
             </div>
 
             <Link
-              href={`/fiche1/${f.id}`}
-              className="px-3 py-2 bg-black text-white rounded"
+              href={`/fiches/${f.id}`}
+              className="px-3 py-2 bg-instat-blue text-white rounded-lg text-sm"
             >
               Ouvrir
             </Link>
