@@ -24,19 +24,15 @@ type Question = {
   ref_table: string | null;
   ref_value_field: string | null;
   ref_label_field: string | null;
-  static_options: any | null; // JSONB
-  display_rules: any | null; // JSONB (optionnel pour plus tard)
+  static_options: any | null;
+  display_rules: any | null;
 };
 
 type RefOption = { value: string | number; label: string };
 
-type AnswerState = {
-  // stocke une valeur simple ou array selon type
-  [question_code: string]: any;
-};
+type AnswerState = Record<string, any>;
 
 function sectionTitle(section: string) {
-  // simple mapping (tu peux améliorer)
   if (section === "section1") return "Section 1 — Identification";
   if (section === "section2") return "Section 2 — Caractéristiques";
   if (section === "section3") return "Section 3 — Réalisation / Exécution";
@@ -51,14 +47,11 @@ export default function Fiche1DynamicForm() {
 
   const [questions, setQuestions] = useState<Question[]>([]);
   const [answers, setAnswers] = useState<AnswerState>({});
-
-  // options cache: key = `${ref_table}|${filterKey}`
   const [optionsCache, setOptionsCache] = useState<Record<string, RefOption[]>>(
     {}
   );
 
-  // IMPORTANT: Région (1.01) influence Cercles (1.02)
-  const selectedRegionId = answers["1.01"]; // on stocke l'id de la région
+  const selectedRegionId = answers["1.01"]; // region id (ref_regions.id)
 
   const sections = useMemo(() => {
     const map = new Map<string, Question[]>();
@@ -67,7 +60,6 @@ export default function Fiche1DynamicForm() {
       arr.push(q);
       map.set(q.section, arr);
     }
-    // tri interne
     for (const [k, arr] of map.entries()) {
       arr.sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
       map.set(k, arr);
@@ -100,9 +92,8 @@ export default function Fiche1DynamicForm() {
     loadQuestions();
   }, []);
 
-  // Charge options d'une question (ref_table ou static_options)
   const getOptions = async (q: Question): Promise<RefOption[]> => {
-    // static_options
+    // static options
     if (q.static_options && Array.isArray(q.static_options)) {
       return q.static_options.map((x: any) => ({
         value: x?.value ?? x,
@@ -115,30 +106,24 @@ export default function Fiche1DynamicForm() {
     const valueField = q.ref_value_field || "id";
     const labelField = q.ref_label_field || "label";
 
-    // filtre spécial pour cercles: dépend de 1.01
+    // cercle depends on region
     let cacheKey = q.ref_table;
-
     if (q.code === "1.02") {
       cacheKey = `${q.ref_table}|region=${selectedRegionId || "none"}`;
-      // si pas de région sélectionnée => pas d'options
       if (!selectedRegionId) return [];
     }
 
-    // cache hit
     if (optionsCache[cacheKey]) return optionsCache[cacheKey];
 
-    // construire requête
     let query = supabase.from(q.ref_table).select(`${valueField},${labelField}`);
 
     if (q.code === "1.02") {
       query = query.eq("region_id", selectedRegionId);
     }
 
-    // tri (si labelField)
     query = query.order(labelField as any, { ascending: true });
 
     const { data, error } = await query;
-
     if (error) {
       console.error(error);
       return [];
@@ -153,15 +138,12 @@ export default function Fiche1DynamicForm() {
     return opts;
   };
 
-  // prefetch options pour select/multiselect quand région change ou questions chargées
   useEffect(() => {
     const prefetch = async () => {
       if (!questions.length) return;
 
-      // On précharge seulement les selects visibles; c’est ok de garder simple
       for (const q of questions) {
         if (q.field_type === "select" || q.field_type === "multiselect") {
-          // pour 1.02, on attend région
           if (q.code === "1.02" && !selectedRegionId) continue;
           await getOptions(q);
         }
@@ -172,22 +154,20 @@ export default function Fiche1DynamicForm() {
   }, [questions, selectedRegionId]);
 
   const setAnswer = (code: string, value: any) => {
-    setAnswers((prev) => ({ ...prev, [code]: value }));
-
-    // Si l’agent change Région => reset Cercle
     if (code === "1.01") {
+      // reset cercle when region changes
       setAnswers((prev) => ({ ...prev, ["1.01"]: value, ["1.02"]: "" }));
+      return;
     }
+    setAnswers((prev) => ({ ...prev, [code]: value }));
   };
 
-  // Convertit state => lignes answers_fiche1
   const buildAnswerRows = (fiche1Id: string) => {
     const rows: any[] = [];
 
     for (const q of questions) {
       const v = answers[q.code];
 
-      // on n’enregistre rien si vide (tu peux changer: enregistrer null)
       if (v === undefined || v === null || v === "") continue;
       if (Array.isArray(v) && v.length === 0) continue;
 
@@ -203,7 +183,7 @@ export default function Fiche1DynamicForm() {
       if (q.field_type === "number") row.value_number = Number(v);
       else if (q.field_type === "yesno" || q.field_type === "checkbox")
         row.value_bool = Boolean(v);
-      else if (q.field_type === "multiselect") row.value_json = v; // array
+      else if (q.field_type === "multiselect") row.value_json = v;
       else row.value_text = String(v);
 
       rows.push(row);
@@ -212,34 +192,28 @@ export default function Fiche1DynamicForm() {
     return rows;
   };
 
-  const createFiche1AndSave = async () => {
+  const createFicheAndSave = async () => {
+    setSaving(true);
     try {
-      setSaving(true);
-
-      // 1) créer une fiche1 minimale (header)
-      // IMPORTANT: adapte les champs si ta table fiche1 a d’autres colonnes not null
+      // IMPORTANT :
+      // Ta table fiche1 doit accepter cet insert.
+      // Si elle exige d'autres colonnes NOT NULL, ajoute-les ici.
       const { data: ficheData, error: ficheErr } = await supabase
         .from("fiche1")
-        .insert([
-          {
-            // tu peux ajouter: year, numero, statut...
-            statut: "brouillon",
-          },
-        ])
+        .insert([{ statut: "brouillon" }])
         .select("id")
         .single();
 
       if (ficheErr) {
         console.error(ficheErr);
         alert(
-          "Erreur création fiche1. Vérifie les colonnes obligatoires de la table fiche1."
+          "Erreur création fiche1. Vérifie les colonnes obligatoires (NOT NULL) dans la table fiche1."
         );
         return;
       }
 
       const fiche1Id = ficheData.id as string;
 
-      // 2) upsert les réponses
       const rows = buildAnswerRows(fiche1Id);
 
       const { error: ansErr } = await supabase
@@ -249,7 +223,7 @@ export default function Fiche1DynamicForm() {
       if (ansErr) {
         console.error(ansErr);
         alert(
-          "Erreur sauvegarde answers_fiche1. Vérifie colonnes fiche1_id/question_code et contrainte unique."
+          "Erreur sauvegarde answers_fiche1. Vérifie fiche1_id/question_code + contrainte unique."
         );
         return;
       }
@@ -261,14 +235,18 @@ export default function Fiche1DynamicForm() {
   };
 
   const renderField = (q: Question) => {
-    const value = answers[q.code] ?? (q.field_type === "multiselect" ? [] : "");
+    const value =
+      answers[q.code] ?? (q.field_type === "multiselect" ? [] : "");
 
-    // YES/NO simple
     if (q.field_type === "yesno") {
       const boolVal =
-        value === true || value === "true" ? true : value === false ? false : "";
+        value === true || value === "true"
+          ? true
+          : value === false || value === "false"
+          ? false
+          : "";
       return (
-        <div className="flex gap-3">
+        <div className="flex gap-4">
           <label className="flex items-center gap-2">
             <input
               type="radio"
@@ -347,30 +325,31 @@ export default function Fiche1DynamicForm() {
       const cacheKey = q.ref_table || q.code;
       const opts = (optionsCache[cacheKey] || []) as RefOption[];
 
-      // fallback: si pas d’options, on laisse un champ texte JSON (rare)
+      const arr: any[] = Array.isArray(value) ? value : [];
+
+      // Si pas d'options (pas encore branché), on laisse une saisie JSON
       if (!opts.length) {
         return (
           <textarea
             className="w-full border rounded px-3 py-2"
             placeholder='Ex: ["valeur1","valeur2"]'
-            value={Array.isArray(value) ? JSON.stringify(value) : ""}
+            value={Array.isArray(value) ? JSON.stringify(value) : "[]"}
             onChange={(e) => {
               try {
                 setAnswer(q.code, JSON.parse(e.target.value || "[]"));
               } catch {
-                // ignore parse error
+                // ignore
               }
             }}
           />
         );
       }
 
-      const arr: any[] = Array.isArray(value) ? value : [];
-
       return (
-        <div className="border rounded p-2 space-y-2">
+        <div className="border rounded p-3 space-y-2">
           {opts.map((o) => {
-            const checked = arr.includes(o.value) || arr.includes(String(o.value));
+            const checked =
+              arr.includes(o.value) || arr.includes(String(o.value));
             return (
               <label key={`${o.value}`} className="flex items-center gap-2">
                 <input
@@ -382,9 +361,7 @@ export default function Fiche1DynamicForm() {
                     } else {
                       setAnswer(
                         q.code,
-                        arr.filter(
-                          (x) => String(x) !== String(o.value)
-                        )
+                        arr.filter((x) => String(x) !== String(o.value))
                       );
                     }
                   }}
@@ -404,23 +381,21 @@ export default function Fiche1DynamicForm() {
     );
   };
 
-  if (loading) return <div className="p-4">Chargement du formulaire…</div>;
+  if (loading) return <div className="p-6">Chargement du formulaire…</div>;
 
   return (
     <div className="space-y-6">
       {sections.map(([sectionKey, qs]) => (
-        <div key={sectionKey} className="border rounded-lg p-4 space-y-4">
+        <div key={sectionKey} className="border rounded-xl p-4 space-y-4">
           <h2 className="text-lg font-semibold">{sectionTitle(sectionKey)}</h2>
 
           <div className="grid gap-4">
             {qs.map((q) => (
               <div key={q.code} className="space-y-1">
-                <div className="flex items-start justify-between gap-3">
-                  <label className="font-medium">
-                    {q.code} — {q.label}
-                    {q.is_required ? <span className="text-red-600"> *</span> : null}
-                  </label>
-                </div>
+                <label className="font-medium">
+                  {q.code} — {q.label}
+                  {q.is_required ? <span className="text-red-600"> *</span> : null}
+                </label>
 
                 {q.help_text ? (
                   <p className="text-xs text-gray-600">{q.help_text}</p>
@@ -433,16 +408,14 @@ export default function Fiche1DynamicForm() {
         </div>
       ))}
 
-      <div className="flex gap-3">
-        <button
-          type="button"
-          className="px-4 py-2 rounded bg-black text-white disabled:opacity-60"
-          disabled={saving}
-          onClick={createFiche1AndSave}
-        >
-          {saving ? "Enregistrement…" : "Enregistrer (brouillon)"}
-        </button>
-      </div>
+      <button
+        type="button"
+        className="px-4 py-2 rounded bg-black text-white disabled:opacity-60"
+        disabled={saving}
+        onClick={createFicheAndSave}
+      >
+        {saving ? "Enregistrement…" : "Enregistrer (brouillon)"}
+      </button>
     </div>
   );
 }
