@@ -1,41 +1,58 @@
-"use client"
+"use client";
 
-import { useEffect, useMemo, useState } from "react"
-import { createClient } from "@/lib/supabase/client"
+import { useEffect, useMemo, useState } from "react";
+import { supabaseClient } from "@/lib/supabase/client";
 
-export type Role = "agent" | "validateur" | "admin"
+export type Role = "agent" | "validateur" | "admin";
 
 export function useRole() {
-  const supabase = useMemo(() => createClient(), [])
+  const supabase = useMemo(() => supabaseClient(), []);
 
-  const [role, setRole] = useState<Role>("agent")
-  const [loading, setLoading] = useState(true)
+  const [role, setRole] = useState<Role>("agent");
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchRole = async () => {
-      const { data: u } = await supabase.auth.getUser()
-      const user = u?.user
+    let alive = true;
 
-      if (!user) {
-        setLoading(false)
-        return
+    const fetchRole = async () => {
+      const { data: u, error: userErr } = await supabase.auth.getUser();
+
+      if (userErr || !u.user) {
+        if (alive) {
+          setRole("agent");
+          setLoading(false);
+        }
+        return;
       }
 
       const { data, error } = await supabase
         .from("profiles")
         .select("role")
-        .eq("id", user.id)
-        .maybeSingle()
+        .eq("id", u.user.id)
+        .maybeSingle();
+
+      if (!alive) return;
 
       if (!error && data?.role) {
-        setRole(data.role as Role)
+        setRole(data.role as Role);
+      } else {
+        setRole("agent");
       }
 
-      setLoading(false)
-    }
+      setLoading(false);
+    };
 
-    fetchRole()
-  }, [supabase])
+    fetchRole();
 
-  return { role, loading }
+    const { data: listener } = supabase.auth.onAuthStateChange(() => {
+      fetchRole();
+    });
+
+    return () => {
+      alive = false;
+      listener.subscription.unsubscribe();
+    };
+  }, [supabase]);
+
+  return { role, loading };
 }
