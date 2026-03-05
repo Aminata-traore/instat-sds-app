@@ -1,36 +1,50 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# INSTAT SDS
+### Système de Digitalisation des Fiches Statistiques
 
-## Getting Started
+Plateforme web permettant la **saisie, la validation et le suivi des fiches statistiques de l’INSTAT**.
 
-First, run the development server:
+L'application remplace les fiches Excel par des **formulaires web dynamiques**, avec un système de validation par rôles.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+---
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+# Fonctionnalités
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Agent
+- création d’une fiche statistique
+- sauvegarde en brouillon
+- soumission au validateur
+- consultation des fiches
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Validateur
+- visualisation des fiches soumises
+- validation ou rejet des fiches
+- ajout de commentaire
 
-## Learn More
+### Administrateur
+- gestion des utilisateurs
+- attribution des rôles
+- supervision globale
 
-To learn more about Next.js, take a look at the following resources:
+---
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+# Technologies utilisées
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Frontend
+- **Next.js 14 (App Router)**
+- **React**
+- **Tailwind CSS**
+- **ShadCN UI**
+- **Recharts**
 
-## Deploy on Vercel
+### Backend
+- **Supabase**
+  - Authentification
+  - Base de données PostgreSQL
+  - RLS (Row Level Security)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Déploiement
+- **Vercel**
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+
+# Architecture du projet
