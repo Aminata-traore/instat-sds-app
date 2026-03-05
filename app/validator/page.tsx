@@ -1,10 +1,7 @@
 import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
-
 import { supabaseServerClient } from "@/lib/supabase/server"
 import type { Role } from "@/lib/types"
-
-import ValidatorFicheList from "@/components/validator/ValidatorFicheList"
 
 export default async function ValidatorPage() {
   const supabase = supabaseServerClient(cookies())
@@ -27,16 +24,6 @@ export default async function ValidatorPage() {
     redirect("/dashboard")
   }
 
-  return (
-    <div className="mx-auto max-w-screen-xl px-4 py-8">
-      <h1 className="text-2xl font-extrabold text-instat-blue mb-2">
-        Validation des fiches
-      </h1>
-      <p className="text-sm text-muted-foreground mb-6">
-        Fiches soumises en attente de décision (validateur / admin).
-      </p>
-
-      <ValidatorFicheList />
-    </div>
-  )
+  // ✅ On centralise toute la validation sur une seule page
+  redirect("/admin/fiche1")
 }
