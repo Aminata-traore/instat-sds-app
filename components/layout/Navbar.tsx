@@ -1,13 +1,21 @@
-"use client"
+"use client";
 
-import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { useEffect, useMemo, useState } from "react"
-import { LogOut, User, Settings, FileText, Home, CheckCircle2, PlusCircle } from "lucide-react"
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import {
+  LogOut,
+  User,
+  Settings,
+  FileText,
+  Home,
+  CheckCircle2,
+  PlusCircle,
+} from "lucide-react";
 
-import { supabaseClient } from "@/lib/supabase/client"
-import type { Profile } from "@/lib/types"
-import { Button } from "@/components/ui/button"
+import { supabase } from "@/lib/supabase/client";
+import type { Profile } from "@/lib/types";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,70 +23,73 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+} from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 export default function Navbar() {
-  const router = useRouter()
-  const supabase = useMemo(() => supabaseClient(), [])
-  const [profile, setProfile] = useState<Profile | null>(null)
+  const router = useRouter();
+  const [profile, setProfile] = useState<Profile | null>(null);
 
   useEffect(() => {
-    let alive = true
+    let alive = true;
 
     const load = async () => {
-      const { data: sess } = await supabase.auth.getSession()
-      const session = sess.session
+      const { data: sess } = await supabase.auth.getSession();
+      const session = sess.session;
+
       if (!session?.user) {
-        if (alive) setProfile(null)
-        return
+        if (alive) setProfile(null);
+        return;
       }
 
       const { data, error } = await supabase
         .from("profiles")
         .select("id,email,full_name,role,created_at,updated_at")
         .eq("id", session.user.id)
-        .maybeSingle()
+        .maybeSingle();
 
-      if (!alive) return
+      if (!alive) return;
+
       if (error) {
-        setProfile(null)
-        return
+        setProfile(null);
+        return;
       }
-      setProfile((data as Profile) ?? null)
-    }
 
-    load()
+      setProfile((data as Profile) ?? null);
+    };
+
+    load();
 
     const { data: auth } = supabase.auth.onAuthStateChange(() => {
-      load()
-    })
+      load();
+    });
 
     return () => {
-      alive = false
-      auth.subscription.unsubscribe()
-    }
-  }, [supabase])
+      alive = false;
+      auth.subscription.unsubscribe();
+    };
+  }, []);
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut()
-    router.push("/auth/login")
-  }
+    await supabase.auth.signOut();
+    router.push("/auth/login");
+  };
 
   const initials = (name: string | null) => {
-    if (!name) return "U"
+    if (!name) return "U";
     return name
       .trim()
       .split(/\s+/)
       .map((n) => n[0])
       .join("")
       .toUpperCase()
-      .slice(0, 2)
-  }
+      .slice(0, 2);
+  };
 
   // UI only — sécurité réelle = RLS
-  const canValidate = profile?.role === "validateur" || profile?.role === "admin"
-  const isAdmin = profile?.role === "admin"
+  const canValidate =
+    profile?.role === "validateur" || profile?.role === "admin";
+  const isAdmin = profile?.role === "admin";
 
   return (
     <nav className="border-b bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60">
@@ -104,14 +115,14 @@ export default function Navbar() {
               </Button>
 
               <Button asChild variant="ghost" size="sm">
-                <Link href="/fiche1/nouvelle">
+                <Link href="/dashboard/fiche1/new">
                   <PlusCircle className="mr-2 h-4 w-4" />
                   Nouvelle Fiche 1
                 </Link>
               </Button>
 
               <Button asChild variant="ghost" size="sm">
-                <Link href="/fiche1/mes-fiches">
+                <Link href="/dashboard/fiche1">
                   <FileText className="mr-2 h-4 w-4" />
                   Mes fiches
                 </Link>
@@ -119,7 +130,7 @@ export default function Navbar() {
 
               {canValidate && (
                 <Button asChild variant="ghost" size="sm">
-                  <Link href="/admin/fiche1">
+                  <Link href="/admin">
                     <CheckCircle2 className="mr-2 h-4 w-4" />
                     Validation
                   </Link>
@@ -139,7 +150,9 @@ export default function Navbar() {
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="h-9 w-9 rounded-full p-0">
                     <Avatar className="h-9 w-9">
-                      <AvatarFallback>{initials(profile.full_name)}</AvatarFallback>
+                      <AvatarFallback>
+                        {initials(profile.full_name)}
+                      </AvatarFallback>
                     </Avatar>
                   </Button>
                 </DropdownMenuTrigger>
@@ -150,9 +163,12 @@ export default function Navbar() {
                       <p className="text-sm font-semibold leading-none">
                         {profile.full_name ?? "Utilisateur"}
                       </p>
-                      <p className="text-xs leading-none text-muted-foreground">{profile.email}</p>
                       <p className="text-xs leading-none text-muted-foreground">
-                        Rôle : <span className="font-semibold">{profile.role}</span>
+                        {profile.email}
+                      </p>
+                      <p className="text-xs leading-none text-muted-foreground">
+                        Rôle :{" "}
+                        <span className="font-semibold">{profile.role}</span>
                       </p>
                     </div>
                   </DropdownMenuLabel>
@@ -166,7 +182,10 @@ export default function Navbar() {
                     </Link>
                   </DropdownMenuItem>
 
-                  <DropdownMenuItem onClick={handleSignOut} className="text-red-600">
+                  <DropdownMenuItem
+                    onClick={handleSignOut}
+                    className="text-red-600"
+                  >
                     <LogOut className="mr-2 h-4 w-4" />
                     <span>Déconnexion</span>
                   </DropdownMenuItem>
@@ -177,5 +196,5 @@ export default function Navbar() {
         </div>
       </div>
     </nav>
-  )
+  );
 }
