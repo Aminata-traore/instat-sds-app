@@ -1,21 +1,27 @@
-import { createBrowserClient } from "@supabase/ssr"
-import type { SupabaseClient } from "@supabase/supabase-js"
+import { createBrowserClient } from "@supabase/ssr";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
-let browserClient: SupabaseClient | undefined
+let browserClient: SupabaseClient | undefined;
 
 export function supabaseClient(): SupabaseClient {
-  if (browserClient) return browserClient
+  if (browserClient) return browserClient;
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error(
-      "Supabase environment variables are missing. Check NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY."
-    )
+      "Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY"
+    );
   }
 
-  browserClient = createBrowserClient(supabaseUrl, supabaseAnonKey)
-
-  return browserClient
+  browserClient = createBrowserClient(supabaseUrl, supabaseAnonKey);
+  return browserClient;
 }
+
+// ✅ export direct pour les fichiers qui font:
+// import { supabase } from "@/lib/supabase/client"
+export const supabase = supabaseClient();
+
+// ✅ optionnel: alias pour compatibilité ancienne syntaxe
+export const createClient = supabaseClient;
