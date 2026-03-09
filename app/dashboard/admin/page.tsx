@@ -44,48 +44,65 @@ export default async function AdminDashboardPage() {
     <AppShell title="Dashboard Admin">
       <div className="space-y-6">
         <div className="grid gap-4 md:grid-cols-3">
-          <div className="rounded-2xl border bg-white p-4">
-            <div className="text-sm text-neutral-500">Fiches totales</div>
-            <div className="text-2xl font-bold">{totalFiches ?? 0}</div>
-          </div>
-          <div className="rounded-2xl border bg-white p-4">
-            <div className="text-sm text-neutral-500">Agents</div>
-            <div className="text-2xl font-bold">{totalAgents ?? 0}</div>
-          </div>
-          <div className="rounded-2xl border bg-white p-4">
-            <div className="text-sm text-neutral-500">Validateurs</div>
-            <div className="text-2xl font-bold">{totalValidateurs ?? 0}</div>
-          </div>
+          <StatCard label="Fiches totales" value={totalFiches ?? 0} />
+          <StatCard label="Agents" value={totalAgents ?? 0} />
+          <StatCard label="Validateurs" value={totalValidateurs ?? 0} />
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
-          <div className="rounded-2xl border bg-white p-5">
-            <h2 className="text-lg font-semibold">Supervision</h2>
-            <p className="mt-2 text-sm text-neutral-600">
-              Voir toutes les fiches, leur statut et suivre la progression globale.
-            </p>
-            <Link
-              href="/admin"
-              className="mt-4 inline-flex rounded-xl bg-black px-4 py-2 text-sm font-semibold text-white"
-            >
-              Ouvrir l’administration
-            </Link>
-          </div>
-
-          <div className="rounded-2xl border bg-white p-5">
-            <h2 className="text-lg font-semibold">Référentiels</h2>
-            <p className="mt-2 text-sm text-neutral-600">
-              Gérer les structures, années, sources de financement et autres référentiels.
-            </p>
-            <Link
-              href="/admin"
-              className="mt-4 inline-flex rounded-xl border px-4 py-2 text-sm font-semibold"
-            >
-              Gérer
-            </Link>
-          </div>
+          <ActionCard
+            title="Administration"
+            text="Superviser les fiches, les statuts et l’activité globale."
+            href="/admin"
+            cta="Ouvrir l’administration"
+            primary
+          />
+          <ActionCard
+            title="Référentiels"
+            text="Gérer les structures, années et sources de financement."
+            href="/admin"
+            cta="Gérer"
+          />
         </div>
       </div>
     </AppShell>
+  );
+}
+
+function StatCard({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-2xl border bg-white p-4">
+      <div className="text-sm text-neutral-500">{label}</div>
+      <div className="text-2xl font-bold">{value}</div>
+    </div>
+  );
+}
+
+function ActionCard({
+  title,
+  text,
+  href,
+  cta,
+  primary,
+}: {
+  title: string;
+  text: string;
+  href: string;
+  cta: string;
+  primary?: boolean;
+}) {
+  return (
+    <div className="rounded-2xl border bg-white p-5">
+      <h2 className="text-lg font-semibold">{title}</h2>
+      <p className="mt-2 text-sm text-neutral-600">{text}</p>
+      <Link
+        href={href}
+        className={`mt-4 inline-flex rounded-xl px-4 py-2 text-sm font-semibold ${
+          primary ? "bg-black text-white" : "border"
+        }`}
+      >
+        {cta}
+      </Link>
+    </div>
   );
 }
