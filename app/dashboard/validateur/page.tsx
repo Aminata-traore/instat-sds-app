@@ -44,18 +44,9 @@ export default async function ValidateurDashboardPage() {
     <AppShell title="Dashboard Validateur">
       <div className="space-y-6">
         <div className="grid gap-4 md:grid-cols-3">
-          <div className="rounded-2xl border bg-white p-4">
-            <div className="text-sm text-neutral-500">En attente</div>
-            <div className="text-2xl font-bold">{enAttente ?? 0}</div>
-          </div>
-          <div className="rounded-2xl border bg-white p-4">
-            <div className="text-sm text-neutral-500">Validées</div>
-            <div className="text-2xl font-bold">{validees ?? 0}</div>
-          </div>
-          <div className="rounded-2xl border bg-white p-4">
-            <div className="text-sm text-neutral-500">Rejetées</div>
-            <div className="text-2xl font-bold">{rejetees ?? 0}</div>
-          </div>
+          <StatCard label="En attente" value={enAttente ?? 0} />
+          <StatCard label="Validées" value={validees ?? 0} />
+          <StatCard label="Rejetées" value={rejetees ?? 0} />
         </div>
 
         <div className="rounded-2xl border bg-white p-5">
@@ -72,5 +63,14 @@ export default async function ValidateurDashboardPage() {
         </div>
       </div>
     </AppShell>
+  );
+}
+
+function StatCard({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-2xl border bg-white p-4">
+      <div className="text-sm text-neutral-500">{label}</div>
+      <div className="text-2xl font-bold">{value}</div>
+    </div>
   );
 }
