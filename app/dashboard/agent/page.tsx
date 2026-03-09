@@ -60,56 +60,67 @@ export default async function AgentDashboardPage() {
     <AppShell title="Dashboard Agent">
       <div className="space-y-6">
         <div className="grid gap-4 md:grid-cols-5">
-          <div className="rounded-2xl border bg-white p-4">
-            <div className="text-sm text-neutral-500">Total</div>
-            <div className="text-2xl font-bold">{totalFiches ?? 0}</div>
-          </div>
-          <div className="rounded-2xl border bg-white p-4">
-            <div className="text-sm text-neutral-500">Brouillons</div>
-            <div className="text-2xl font-bold">{brouillons ?? 0}</div>
-          </div>
-          <div className="rounded-2xl border bg-white p-4">
-            <div className="text-sm text-neutral-500">Soumises</div>
-            <div className="text-2xl font-bold">{soumises ?? 0}</div>
-          </div>
-          <div className="rounded-2xl border bg-white p-4">
-            <div className="text-sm text-neutral-500">Validées</div>
-            <div className="text-2xl font-bold">{validees ?? 0}</div>
-          </div>
-          <div className="rounded-2xl border bg-white p-4">
-            <div className="text-sm text-neutral-500">Rejetées</div>
-            <div className="text-2xl font-bold">{rejetees ?? 0}</div>
-          </div>
+          <StatCard label="Total" value={totalFiches ?? 0} />
+          <StatCard label="Brouillons" value={brouillons ?? 0} />
+          <StatCard label="Soumises" value={soumises ?? 0} />
+          <StatCard label="Validées" value={validees ?? 0} />
+          <StatCard label="Rejetées" value={rejetees ?? 0} />
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
-          <div className="rounded-2xl border bg-white p-5">
-            <h2 className="text-lg font-semibold">Nouvelle saisie</h2>
-            <p className="mt-2 text-sm text-neutral-600">
-              Créer une nouvelle fiche 1 et l’enregistrer en brouillon ou la soumettre.
-            </p>
-            <Link
-              href="/dashboard/fiche1/new"
-              className="mt-4 inline-flex rounded-xl bg-black px-4 py-2 text-sm font-semibold text-white"
-            >
-              Nouvelle fiche
-            </Link>
-          </div>
-
-          <div className="rounded-2xl border bg-white p-5">
-            <h2 className="text-lg font-semibold">Mes fiches</h2>
-            <p className="mt-2 text-sm text-neutral-600">
-              Consulter vos brouillons, vos soumissions et les décisions de validation.
-            </p>
-            <Link
-              href="/dashboard/fiche1"
-              className="mt-4 inline-flex rounded-xl border px-4 py-2 text-sm font-semibold"
-            >
-              Voir mes fiches
-            </Link>
-          </div>
+          <ActionCard
+            title="Nouvelle fiche"
+            text="Créer une nouvelle fiche 1 et l’enregistrer en brouillon ou la soumettre."
+            href="/dashboard/fiche1/new"
+            cta="Créer une fiche"
+            primary
+          />
+          <ActionCard
+            title="Mes fiches"
+            text="Voir mes brouillons, mes soumissions, mes validations et mes rejets."
+            href="/dashboard/fiche1"
+            cta="Ouvrir mes fiches"
+          />
         </div>
       </div>
     </AppShell>
+  );
+}
+
+function StatCard({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-2xl border bg-white p-4">
+      <div className="text-sm text-neutral-500">{label}</div>
+      <div className="text-2xl font-bold">{value}</div>
+    </div>
+  );
+}
+
+function ActionCard({
+  title,
+  text,
+  href,
+  cta,
+  primary,
+}: {
+  title: string;
+  text: string;
+  href: string;
+  cta: string;
+  primary?: boolean;
+}) {
+  return (
+    <div className="rounded-2xl border bg-white p-5">
+      <h2 className="text-lg font-semibold">{title}</h2>
+      <p className="mt-2 text-sm text-neutral-600">{text}</p>
+      <Link
+        href={href}
+        className={`mt-4 inline-flex rounded-xl px-4 py-2 text-sm font-semibold ${
+          primary ? "bg-black text-white" : "border"
+        }`}
+      >
+        {cta}
+      </Link>
+    </div>
   );
 }
