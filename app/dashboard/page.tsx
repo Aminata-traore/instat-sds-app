@@ -23,13 +23,7 @@ export default async function DashboardPage() {
 
   const role = profile?.role ?? "agent";
 
-  if (role === "admin") {
-    redirect("/dashboard/admin");
-  }
-
-  if (role === "validateur") {
-    redirect("/dashboard/validateur");
-  }
-
+  if (role === "admin") redirect("/dashboard/admin");
+  if (role === "validateur") redirect("/dashboard/validateur");
   redirect("/dashboard/agent");
 }
