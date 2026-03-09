@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 
 type Question = {
@@ -45,20 +46,27 @@ function toBool(v: any): boolean {
   if (v === false) return false;
   if (v === 1 || v === "1") return true;
   if (v === 0 || v === "0") return false;
+
   const s = String(v ?? "").trim().toLowerCase();
   if (s === "true" || s === "oui" || s === "yes") return true;
   if (s === "false" || s === "non" || s === "no") return false;
+
   return Boolean(v);
 }
 
 function smartCastSelectValue(raw: string) {
-  // si c'est un nombre, on cast en number
   if (raw === "") return "";
   const n = Number(raw);
   return Number.isFinite(n) && String(n) === raw ? n : raw;
 }
 
+function isFreeTextFallback(code: string) {
+  return ["2.02", "2.03", "3.02", "3.05", "3.08"].includes(code);
+}
+
 export default function Fiche1DynamicForm() {
+  const router = useRouter();
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -68,23 +76,25 @@ export default function Fiche1DynamicForm() {
     {}
   );
 
-  const selectedRegionId = answers["1.01"] || ""; // region id (ref_regions.id)
+  const selectedRegionId = answers["1.01"] || "";
 
   const sections = useMemo(() => {
     const map = new Map<string, Question[]>();
+
     for (const q of questions) {
       const arr = map.get(q.section) ?? [];
       arr.push(q);
       map.set(q.section, arr);
     }
+
     for (const [k, arr] of map.entries()) {
       arr.sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
       map.set(k, arr);
     }
+
     return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
   }, [questions]);
 
-  // Charger les questions
   useEffect(() => {
     (async () => {
       setLoading(true);
@@ -98,7 +108,7 @@ export default function Fiche1DynamicForm() {
         .order("order_index", { ascending: true });
 
       if (error) {
-        console.error(error);
+        console.error("Erreur chargement fiche1_questions:", error);
         alert("Erreur chargement questions (fiche1_questions).");
         setLoading(false);
         return;
@@ -110,7 +120,6 @@ export default function Fiche1DynamicForm() {
   }, []);
 
   const getOptions = async (q: Question): Promise<RefOption[]> => {
-    // static options
     if (q.static_options && Array.isArray(q.static_options)) {
       return q.static_options.map((x: any) => ({
         value: x?.value ?? x,
@@ -123,8 +132,8 @@ export default function Fiche1DynamicForm() {
     const valueField = q.ref_value_field || "id";
     const labelField = q.ref_label_field || "label";
 
-    // cercle dépend de la région
     let cacheKey = q.ref_table;
+
     if (q.code === "1.02") {
       cacheKey = `${q.ref_table}|region=${selectedRegionId || "none"}`;
       if (!selectedRegionId) return [];
@@ -141,8 +150,9 @@ export default function Fiche1DynamicForm() {
     query = query.order(labelField as any, { ascending: true });
 
     const { data, error } = await query;
+
     if (error) {
-      console.error(error);
+      console.error(`Erreur chargement options ${q.code}:`, error);
       return [];
     }
 
@@ -155,7 +165,6 @@ export default function Fiche1DynamicForm() {
     return opts;
   };
 
-  // Prefetch options
   useEffect(() => {
     (async () => {
       if (!questions.length) return;
@@ -167,15 +176,28 @@ export default function Fiche1DynamicForm() {
         }
       }
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [questions, selectedRegionId]);
 
   const setAnswer = (code: string, value: any) => {
     if (code === "1.01") {
-      // reset cercle quand région change
-      setAnswers((prev) => ({ ...prev, ["1.01"]: value, ["1.02"]: "" }));
+      setAnswers((prev) => ({
+        ...prev,
+        ["1.01"]: value,
+        ["1.02"]: "",
+        ["1.03"]: "",
+      }));
       return;
     }
+
+    if (code === "1.02") {
+      setAnswers((prev) => ({
+        ...prev,
+        ["1.02"]: value,
+        ["1.03"]: "",
+      }));
+      return;
+    }
+
     setAnswers((prev) => ({ ...prev, [code]: value }));
   };
 
@@ -197,11 +219,15 @@ export default function Fiche1DynamicForm() {
         value_json: null,
       };
 
-      if (q.field_type === "number") row.value_number = Number(v);
-      else if (q.field_type === "yesno" || q.field_type === "checkbox")
+      if (q.field_type === "number") {
+        row.value_number = Number(v);
+      } else if (q.field_type === "yesno" || q.field_type === "checkbox") {
         row.value_bool = toBool(v);
-      else if (q.field_type === "multiselect") row.value_json = v;
-      else row.value_text = String(v);
+      } else if (q.field_type === "multiselect" && !isFreeTextFallback(q.code)) {
+        row.value_json = v;
+      } else {
+        row.value_text = String(v);
+      }
 
       rows.push(row);
     }
@@ -210,41 +236,72 @@ export default function Fiche1DynamicForm() {
   };
 
   const createFiche = async (statut: "brouillon" | "soumis") => {
-    // récupérer user id
-    const { data: u } = await supabase.auth.getUser();
+    const { data: u, error: userErr } = await supabase.auth.getUser();
+
+    if (userErr) {
+      throw new Error(userErr.message);
+    }
+
     const uid = u.user?.id ?? null;
 
-    // tentative 1: colonne "statut"
-    let res = await supabase
+    const region_id = answers["1.01"] || null;
+    const cercle_id = answers["1.02"] || null;
+    const structure_id = answers["1.03"] || null;
+    const responsable_nom = answers["1.04"] || null;
+    const anneeRaw = answers["1.05"] || null;
+    const numero_fiche = answers["1.06"] || null;
+
+    const annee =
+      anneeRaw !== null && anneeRaw !== undefined && anneeRaw !== ""
+        ? Number(anneeRaw)
+        : null;
+
+    if (!region_id) throw new Error("Le champ Région est obligatoire.");
+    if (!cercle_id) throw new Error("Le champ Cercle est obligatoire.");
+    if (!structure_id) throw new Error("Le champ Structure est obligatoire.");
+    if (!responsable_nom) {
+      throw new Error("Le champ Nom et prénom de la responsable est obligatoire.");
+    }
+    if (!annee || Number.isNaN(annee)) {
+      throw new Error("Le champ Choix de l’année est obligatoire.");
+    }
+    if (!numero_fiche) {
+      throw new Error("Le champ Numéro de la fiche est obligatoire.");
+    }
+
+    const payload = {
+      region_id,
+      cercle_id,
+      structure_id,
+      responsable_nom: String(responsable_nom),
+      annee,
+      numero_fiche: String(numero_fiche),
+      statut,
+      created_by: uid,
+    };
+
+    const { data, error } = await supabase
       .from("fiche1")
-      .insert([{ statut, created_by: uid }])
+      .insert([payload])
       .select("id")
       .single();
 
-    if (!res.error && res.data?.id) return String(res.data.id);
-
-    // fallback: si la colonne s'appelle "status"
-    const res2 = await supabase
-      .from("fiche1")
-      .insert([{ status: statut, created_by: uid } as any])
-      .select("id")
-      .single();
-
-    if (res2.error) {
-      console.error(res.error, res2.error);
+    if (error) {
+      console.error("Erreur createFiche:", error, payload);
       throw new Error(
-        "Erreur création fiche1. Vérifie les colonnes obligatoires (NOT NULL) et si la colonne statut s'appelle statut ou status."
+        error.message ||
+          "Erreur création fiche1. Vérifie les colonnes obligatoires de la table fiche1."
       );
     }
 
-    return String(res2.data.id);
+    return String(data.id);
   };
 
   const saveFiche = async (mode: "brouillon" | "soumis") => {
     setSaving(true);
+
     try {
       const fiche1Id = await createFiche(mode);
-
       const rows = buildAnswerRows(fiche1Id);
 
       const { error: ansErr } = await supabase
@@ -252,18 +309,23 @@ export default function Fiche1DynamicForm() {
         .upsert(rows, { onConflict: "fiche1_id,question_code" });
 
       if (ansErr) {
-        console.error(ansErr);
+        console.error("Erreur answers_fiche1:", ansErr);
         alert(
-          "Erreur sauvegarde answers_fiche1. Vérifie fiche1_id/question_code + contrainte unique."
+          "Erreur sauvegarde answers_fiche1. Vérifie la contrainte unique fiche1_id,question_code."
         );
         return;
       }
 
-      alert(mode === "soumis" ? "✅ Fiche 1 soumise pour validation." : "✅ Fiche 1 enregistrée (brouillon).");
+      alert(
+        mode === "soumis"
+          ? "✅ Fiche 1 soumise pour validation."
+          : "✅ Fiche 1 enregistrée en brouillon."
+      );
 
-      // (Optionnel) vider le formulaire après succès
       setAnswers({});
+      router.push("/dashboard");
     } catch (e: any) {
+      console.error(e);
       alert(e?.message ?? "Erreur inconnue");
     } finally {
       setSaving(false);
@@ -280,6 +342,7 @@ export default function Fiche1DynamicForm() {
           : value === false || value === "false"
           ? false
           : "";
+
       return (
         <div className="flex gap-4">
           <label className="flex items-center gap-2">
@@ -291,6 +354,7 @@ export default function Fiche1DynamicForm() {
             />
             Oui
           </label>
+
           <label className="flex items-center gap-2">
             <input
               type="radio"
@@ -304,7 +368,11 @@ export default function Fiche1DynamicForm() {
       );
     }
 
-    if (q.field_type === "text" || q.field_type === "date" || q.field_type === "number") {
+    if (
+      q.field_type === "text" ||
+      q.field_type === "date" ||
+      q.field_type === "number"
+    ) {
       return (
         <input
           type={q.field_type === "text" ? "text" : q.field_type}
@@ -347,6 +415,7 @@ export default function Fiche1DynamicForm() {
               ? "Choisis d’abord la région"
               : "-- Choisir --"}
           </option>
+
           {opts.map((o) => (
             <option key={`${o.value}`} value={String(o.value)}>
               {o.label}
@@ -359,23 +428,15 @@ export default function Fiche1DynamicForm() {
     if (q.field_type === "multiselect") {
       const cacheKey = q.ref_table || q.code;
       const opts = (optionsCache[cacheKey] || []) as RefOption[];
-
       const arr: any[] = Array.isArray(value) ? value : [];
 
-      // fallback JSON
       if (!opts.length) {
         return (
           <textarea
             className="w-full border rounded px-3 py-2"
-            placeholder='Ex: ["valeur1","valeur2"]'
-            value={Array.isArray(value) ? JSON.stringify(value) : "[]"}
-            onChange={(e) => {
-              try {
-                setAnswer(q.code, JSON.parse(e.target.value || "[]"));
-              } catch {
-                // ignore
-              }
-            }}
+            placeholder="Saisir votre justification ici"
+            value={typeof value === "string" ? value : ""}
+            onChange={(e) => setAnswer(q.code, e.target.value)}
           />
         );
       }
@@ -384,14 +445,21 @@ export default function Fiche1DynamicForm() {
         <div className="border rounded p-3 space-y-2">
           {opts.map((o) => {
             const checked = arr.includes(o.value) || arr.includes(String(o.value));
+
             return (
               <label key={`${o.value}`} className="flex items-center gap-2">
                 <input
                   type="checkbox"
                   checked={checked}
                   onChange={(e) => {
-                    if (e.target.checked) setAnswer(q.code, [...arr, o.value]);
-                    else setAnswer(q.code, arr.filter((x) => String(x) !== String(o.value)));
+                    if (e.target.checked) {
+                      setAnswer(q.code, [...arr, o.value]);
+                    } else {
+                      setAnswer(
+                        q.code,
+                        arr.filter((x) => String(x) !== String(o.value))
+                      );
+                    }
                   }}
                 />
                 {o.label}
@@ -402,13 +470,27 @@ export default function Fiche1DynamicForm() {
       );
     }
 
-    return <div className="text-sm text-red-600">Champ non supporté: {q.field_type}</div>;
+    return (
+      <div className="text-sm text-red-600">
+        Champ non supporté: {q.field_type}
+      </div>
+    );
   };
 
   if (loading) return <div className="p-6">Chargement du formulaire…</div>;
 
   return (
     <div className="space-y-6">
+      <div className="flex flex-wrap gap-3">
+        <button
+          type="button"
+          onClick={() => router.back()}
+          className="px-4 py-2 rounded border bg-white font-semibold"
+        >
+          Retour
+        </button>
+      </div>
+
       {sections.map(([sectionKey, qs]) => (
         <div key={sectionKey} className="border rounded-xl p-4 space-y-4">
           <h2 className="text-lg font-semibold">{sectionTitle(sectionKey)}</h2>
