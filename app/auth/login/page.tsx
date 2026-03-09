@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 import { supabase } from "@/lib/supabase/client";
@@ -23,14 +23,21 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [infoMessage, setInfoMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const [redirectTo, setRedirectTo] = useState("");
 
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const redirectTo = searchParams.get("redirectTo") || "";
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      setRedirectTo(params.get("redirectTo") || "");
+      setInfoMessage(params.get("message") || "");
+    }
+  }, []);
 
   const goByRole = async () => {
-    // ✅ si on a un redirectTo (cas page protégée), on respecte
     if (redirectTo) {
       router.push(redirectTo);
       return;
@@ -63,7 +70,6 @@ export default function LoginPage() {
 
     const role = (p?.role ?? "agent") as Role;
 
-    // ✅ aligné avec ton app
     if (role === "admin" || role === "validateur") {
       router.push("/admin");
       return;
@@ -87,8 +93,7 @@ export default function LoginPage() {
     return () => {
       alive = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [redirectTo]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -121,6 +126,12 @@ export default function LoginPage() {
         </CardHeader>
 
         <CardContent>
+          {infoMessage && (
+            <div className="mb-4 rounded-xl border border-green-200 bg-green-50 p-3 text-sm text-green-700">
+              {infoMessage}
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
