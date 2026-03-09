@@ -1,26 +1,16 @@
-```tsx
 "use client";
 
-import Navbar from "./Navbar";
 import Footer from "./Footer";
 
-export default function RootLayoutClient({
-  children,
-}: {
+type Props = {
   children: React.ReactNode;
-}) {
+};
+
+export default function RootLayoutClient({ children }: Props) {
   return (
     <div className="flex min-h-screen flex-col bg-instat-gray">
-
-      <Navbar />
-
-      <main className="flex-1">
-        {children}
-      </main>
-
+      <main className="flex-1">{children}</main>
       <Footer />
-
     </div>
   );
 }
-```
