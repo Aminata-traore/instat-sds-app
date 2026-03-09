@@ -71,12 +71,10 @@ export default function LoginPage() {
 
     if (redirectTo) router.push(redirectTo);
     else router.push("/dashboard");
-
-    setLoading(false);
   };
 
   return (
-    <div className="min-h-screen bg-instat-gray flex items-center justify-center px-4">
+    <div className="min-h-screen bg-neutral-100 flex items-center justify-center px-4">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-2">
           <CardTitle className="text-center">Connexion</CardTitle>
@@ -129,10 +127,7 @@ export default function LoginPage() {
         <CardFooter className="justify-center">
           <p className="text-sm text-muted-foreground">
             Pas encore de compte ?{" "}
-            <Link
-              href="/auth/register"
-              className="text-instat-lightBlue hover:underline"
-            >
+            <Link href="/auth/register" className="hover:underline">
               S&apos;inscrire
             </Link>
           </p>
