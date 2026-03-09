@@ -125,10 +125,7 @@ export function AppShell({
 
             {(role === "validateur" || role === "admin") && (
               <>
-                <NavLink
-                  href="/dashboard/validateur"
-                  label="Dashboard Validateur"
-                />
+                <NavLink href="/dashboard/validateur" label="Dashboard Validateur" />
                 <NavLink href="/admin" label="Validation des fiches" />
               </>
             )}
