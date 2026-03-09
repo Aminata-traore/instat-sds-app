@@ -17,17 +17,15 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
-type Role = "admin" | "validateur" | "agent" | string;
-
 export default function LoginPage() {
+  const router = useRouter();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [infoMessage, setInfoMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [redirectTo, setRedirectTo] = useState("");
-
-  const router = useRouter();
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -37,47 +35,6 @@ export default function LoginPage() {
     }
   }, []);
 
-  const goByRole = async () => {
-    if (redirectTo) {
-      router.push(redirectTo);
-      return;
-    }
-
-    const { data: u, error: eUser } = await supabase.auth.getUser();
-    if (eUser) {
-      console.error(eUser);
-      router.push("/dashboard/fiche1/new");
-      return;
-    }
-
-    const uid = u.user?.id;
-    if (!uid) {
-      router.push("/auth/login");
-      return;
-    }
-
-    const { data: p, error: eProf } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", uid)
-      .maybeSingle();
-
-    if (eProf) {
-      console.error(eProf);
-      router.push("/dashboard/fiche1/new");
-      return;
-    }
-
-    const role = (p?.role ?? "agent") as Role;
-
-    if (role === "admin" || role === "validateur") {
-      router.push("/admin");
-      return;
-    }
-
-    router.push("/dashboard/fiche1/new");
-  };
-
   useEffect(() => {
     let alive = true;
 
@@ -86,14 +43,15 @@ export default function LoginPage() {
       if (!alive) return;
 
       if (data.session) {
-        await goByRole();
+        if (redirectTo) router.replace(redirectTo);
+        else router.replace("/dashboard");
       }
     })();
 
     return () => {
       alive = false;
     };
-  }, [redirectTo]);
+  }, [redirectTo, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -111,7 +69,9 @@ export default function LoginPage() {
       return;
     }
 
-    await goByRole();
+    if (redirectTo) router.push(redirectTo);
+    else router.push("/dashboard");
+
     setLoading(false);
   };
 
