@@ -1,22 +1,14 @@
-```tsx
 export default function Footer() {
-  const year = new Date().getFullYear();
-
   return (
     <footer className="mt-auto border-t bg-instat-gray">
       <div className="mx-auto max-w-screen-xl px-4 py-4 text-center">
-
         <p className="text-sm text-muted-foreground">
-          © {year} INSTAT — Institut National de la Statistique.
-          Tous droits réservés.
+          © {new Date().getFullYear()} INSTAT — Institut National de la Statistique
         </p>
-
         <p className="mt-1 text-xs text-muted-foreground">
           République du Mali
         </p>
-
       </div>
     </footer>
   );
 }
-```
