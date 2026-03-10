@@ -15,15 +15,30 @@ export default async function DashboardPage() {
     redirect("/auth/login?redirectTo=/dashboard");
   }
 
-  const { data: profile } = await supabase
+  const { data: profile, error } = await supabase
     .from("profiles")
     .select("role")
     .eq("id", session.user.id)
     .maybeSingle();
 
-  const role = profile?.role ?? "agent";
+  if (error) {
+    console.error("Erreur chargement profil dashboard:", error);
+    redirect("/auth/login");
+  }
 
-  if (role === "admin") redirect("/dashboard/admin");
-  if (role === "validateur") redirect("/dashboard/validateur");
-  redirect("/dashboard/agent");
+  const role = profile?.role;
+
+  if (role === "admin") {
+    redirect("/dashboard/admin");
+  }
+
+  if (role === "validateur") {
+    redirect("/dashboard/validateur");
+  }
+
+  if (role === "agent") {
+    redirect("/dashboard/agent");
+  }
+
+  redirect("/auth/login");
 }
