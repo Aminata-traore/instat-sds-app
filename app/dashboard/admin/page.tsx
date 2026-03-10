@@ -13,15 +13,34 @@ export default async function AdminDashboardPage() {
     data: { session },
   } = await supabase.auth.getSession();
 
-  if (!session) redirect("/auth/login?redirectTo=/dashboard/admin");
+  if (!session) {
+    redirect("/auth/login?redirectTo=/dashboard/admin");
+  }
 
-  const { data: profile } = await supabase
+  const { data: profile, error } = await supabase
     .from("profiles")
     .select("role")
     .eq("id", session.user.id)
     .maybeSingle();
 
-  if (profile?.role !== "admin") redirect("/dashboard");
+  if (error) {
+    console.error("Erreur chargement profil admin:", error);
+    redirect("/auth/login");
+  }
+
+  const role = profile?.role;
+
+  if (role === "agent") {
+    redirect("/dashboard/agent");
+  }
+
+  if (role === "validateur") {
+    redirect("/dashboard/validateur");
+  }
+
+  if (role !== "admin") {
+    redirect("/auth/login");
+  }
 
   const { count: totalFiches } = await supabase
     .from("fiche1")
