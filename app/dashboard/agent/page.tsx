@@ -13,18 +13,33 @@ export default async function AgentDashboardPage() {
     data: { session },
   } = await supabase.auth.getSession();
 
-  if (!session) redirect("/auth/login?redirectTo=/dashboard/agent");
+  if (!session) {
+    redirect("/auth/login?redirectTo=/dashboard/agent");
+  }
 
-  const { data: profile } = await supabase
+  const { data: profile, error } = await supabase
     .from("profiles")
     .select("role")
     .eq("id", session.user.id)
     .maybeSingle();
 
-  if (profile?.role !== "agent") {
-    if (profile?.role === "validateur") redirect("/dashboard/validateur");
-    if (profile?.role === "admin") redirect("/dashboard/admin");
-    redirect("/dashboard");
+  if (error) {
+    console.error("Erreur chargement profil agent:", error);
+    redirect("/auth/login");
+  }
+
+  const role = profile?.role;
+
+  if (role === "validateur") {
+    redirect("/dashboard/validateur");
+  }
+
+  if (role === "admin") {
+    redirect("/dashboard/admin");
+  }
+
+  if (role !== "agent") {
+    redirect("/auth/login");
   }
 
   const { count: totalFiches } = await supabase
