@@ -1,142 +1,65 @@
 export const dynamic = "force-dynamic";
 
 import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { supabaseServerClient } from "@/lib/supabase/server";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { FileText, CheckCircle, XCircle, Clock } from "lucide-react";
+import { AppShell } from "@/app/_components/AppShell";
+import { StatusBadge } from "@/components/StatusBadge";
 
-export default async function AdminPage() {
+export default async function AdminValidationPage() {
   const supabase = supabaseServerClient(cookies());
 
   const {
     data: { session },
   } = await supabase.auth.getSession();
 
-  if (!session) redirect("/auth/login");
+  if (!session) redirect("/auth/login?redirectTo=/admin");
 
-  const { data: profile, error: profErr } = await supabase
+  const { data: profile } = await supabase
     .from("profiles")
     .select("role")
     .eq("id", session.user.id)
     .maybeSingle();
 
-  if (profErr) redirect("/dashboard");
-
-  const role = profile?.role ?? "agent";
-
-  // ✅ Admin + Validateur
-  if (!["admin", "validateur"].includes(String(role))) redirect("/dashboard");
-
-  // helper: compter selon statut (et gérer si colonne s'appelle "status")
-  const countBy = async (col: "statut" | "status", value?: string) => {
-    let q = supabase.from("fiche1").select("id", { count: "exact", head: true });
-    if (value) q = q.eq(col, value);
-    return q;
-  };
-
-  // Tentative avec "statut" puis fallback "status"
-  let totalFiches = 0;
-  let enAttente = 0;
-  let totalValide = 0;
-  let totalRejete = 0;
-
-  // total
-  const t1 = await countBy("statut");
-  if (!t1.error) {
-    totalFiches = t1.count ?? 0;
-
-    const a1 = await countBy("statut", "soumis");
-    enAttente = a1.count ?? 0;
-
-    const v1 = await countBy("statut", "valide");
-    totalValide = v1.count ?? 0;
-
-    const r1 = await countBy("statut", "rejete");
-    totalRejete = r1.count ?? 0;
-  } else {
-    // fallback "status"
-    const t2 = await countBy("status");
-    totalFiches = t2.count ?? 0;
-
-    const a2 = await countBy("status", "soumis");
-    enAttente = a2.count ?? 0;
-
-    const v2 = await countBy("status", "valide");
-    totalValide = v2.count ?? 0;
-
-    const r2 = await countBy("status", "rejete");
-    totalRejete = r2.count ?? 0;
+  if (profile?.role !== "validateur" && profile?.role !== "admin") {
+    redirect("/dashboard/agent");
   }
 
+  const { data: fiches } = await supabase
+    .from("fiche1")
+    .select("*")
+    .order("created_at", { ascending: false });
+
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex items-center justify-between gap-3 mb-6">
-        <div>
-          <h1 className="text-3xl font-bold">Administration</h1>
-          <p className="text-sm text-muted-foreground">
-            Supervision — Workflow validation Fiche 1
-          </p>
-          <p className="text-xs text-muted-foreground mt-1">
-            Connecté en tant que : <span className="font-semibold">{String(role)}</span>
-          </p>
-        </div>
+    <AppShell title="Validation des fiches">
+      <div className="space-y-4">
+        {fiches?.map((f) => (
+          <div
+            key={f.id}
+            className="rounded-2xl border bg-white p-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between"
+          >
+            <div>
+              <div className="font-semibold">Fiche {f.numero_fiche}</div>
+              <div className="text-sm text-gray-500">Année {f.annee}</div>
+              <div className="text-sm text-gray-500">
+                Responsable : {f.responsable_nom}
+              </div>
+            </div>
 
-        {/* ✅ route cohérente avec ton repo: /admin affiche la liste (AdminFiche1Client)
-            et chaque fiche a /admin/fiche1/[id] */}
-        <Link
-          href="/admin"
-          className="rounded-xl bg-black px-4 py-2 text-sm font-semibold text-white"
-        >
-          Aller à la validation
-        </Link>
+            <div className="flex items-center gap-3 flex-wrap">
+              <StatusBadge status={f.statut} />
+
+              <Link
+                href={`/admin/fiche1/${f.id}`}
+                className="px-3 py-2 rounded-lg border text-sm font-medium"
+              >
+                Vérifier
+              </Link>
+            </div>
+          </div>
+        ))}
       </div>
-
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Fiches totales</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalFiches}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">En attente</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{enAttente}</div>
-            <p className="text-xs text-muted-foreground mt-1">Statut: soumis</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Validées</CardTitle>
-            <CheckCircle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalValide}</div>
-            <p className="text-xs text-muted-foreground mt-1">Statut: valide</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Rejetées</CardTitle>
-            <XCircle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalRejete}</div>
-            <p className="text-xs text-muted-foreground mt-1">Statut: rejete</p>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+    </AppShell>
   );
 }
