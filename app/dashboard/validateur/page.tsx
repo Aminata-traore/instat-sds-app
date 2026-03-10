@@ -13,16 +13,33 @@ export default async function ValidateurDashboardPage() {
     data: { session },
   } = await supabase.auth.getSession();
 
-  if (!session) redirect("/auth/login?redirectTo=/dashboard/validateur");
+  if (!session) {
+    redirect("/auth/login?redirectTo=/dashboard/validateur");
+  }
 
-  const { data: profile } = await supabase
+  const { data: profile, error } = await supabase
     .from("profiles")
     .select("role")
     .eq("id", session.user.id)
     .maybeSingle();
 
-  if (profile?.role !== "validateur" && profile?.role !== "admin") {
+  if (error) {
+    console.error("Erreur chargement profil validateur:", error);
+    redirect("/auth/login");
+  }
+
+  const role = profile?.role;
+
+  if (role === "agent") {
     redirect("/dashboard/agent");
+  }
+
+  if (role === "admin") {
+    redirect("/dashboard/admin");
+  }
+
+  if (role !== "validateur") {
+    redirect("/auth/login");
   }
 
   const { count: enAttente } = await supabase
