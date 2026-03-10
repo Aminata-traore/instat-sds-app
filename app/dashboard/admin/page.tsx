@@ -21,10 +21,7 @@ export default async function AdminDashboardPage() {
     .eq("id", session.user.id)
     .maybeSingle();
 
-  if (profile?.role !== "admin") {
-    if (profile?.role === "validateur") redirect("/dashboard/validateur");
-    redirect("/dashboard/agent");
-  }
+  if (profile?.role !== "admin") redirect("/dashboard");
 
   const { count: totalFiches } = await supabase
     .from("fiche1")
@@ -49,19 +46,25 @@ export default async function AdminDashboardPage() {
           <StatCard label="Validateurs" value={totalValidateurs ?? 0} />
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 md:grid-cols-3">
           <ActionCard
-            title="Administration"
-            text="Superviser les fiches, les statuts et l’activité globale."
+            title="Validation"
+            text="Contrôler et suivre les fiches soumises."
             href="/admin"
-            cta="Ouvrir l’administration"
+            cta="Ouvrir"
             primary
           />
           <ActionCard
-            title="Référentiels"
-            text="Gérer les structures, années et sources de financement."
-            href="/admin"
-            cta="Gérer"
+            title="Statistiques"
+            text="Analyser les fiches par statut et par année."
+            href="/dashboard/admin/stats"
+            cta="Voir les stats"
+          />
+          <ActionCard
+            title="Export"
+            text="Télécharger les données sous Excel."
+            href="/api/export/fiche1"
+            cta="Exporter"
           />
         </div>
       </div>
