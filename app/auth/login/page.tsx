@@ -35,24 +35,6 @@ export default function LoginPage() {
     }
   }, []);
 
-  useEffect(() => {
-    let alive = true;
-
-    (async () => {
-      const { data } = await supabase.auth.getSession();
-      if (!alive) return;
-
-      if (data.session) {
-        if (redirectTo) router.replace(redirectTo);
-        else router.replace("/dashboard");
-      }
-    })();
-
-    return () => {
-      alive = false;
-    };
-  }, [redirectTo, router]);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -69,8 +51,7 @@ export default function LoginPage() {
       return;
     }
 
-    if (redirectTo) router.push(redirectTo);
-    else router.push("/dashboard");
+    router.replace(redirectTo || "/dashboard");
   };
 
   return (
@@ -84,11 +65,11 @@ export default function LoginPage() {
         </CardHeader>
 
         <CardContent>
-          {infoMessage && (
+          {infoMessage ? (
             <div className="mb-4 rounded-xl border border-green-200 bg-green-50 p-3 text-sm text-green-700">
               {infoMessage}
             </div>
-          )}
+          ) : null}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
@@ -101,6 +82,7 @@ export default function LoginPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 disabled={loading}
+                autoComplete="email"
               />
             </div>
 
@@ -113,10 +95,11 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 disabled={loading}
+                autoComplete="current-password"
               />
             </div>
 
-            {error && <p className="text-sm text-red-600">{error}</p>}
+            {error ? <p className="text-sm text-red-600">{error}</p> : null}
 
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? "Connexion..." : "Se connecter"}
