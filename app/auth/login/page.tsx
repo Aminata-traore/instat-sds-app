@@ -1,9 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
-
 import { supabase } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,19 +16,17 @@ import {
 } from "@/components/ui/card";
 
 export default function LoginPage() {
-  const router = useRouter();
-
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [infoMessage, setInfoMessage] = useState("");
   const [loading, setLoading] = useState(false);
-  const [redirectTo, setRedirectTo] = useState("");
+  const [redirectTo, setRedirectTo] = useState("/dashboard");
 
   useEffect(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
-      setRedirectTo(params.get("redirectTo") || "");
+      setRedirectTo(params.get("redirectTo") || "/dashboard");
       setInfoMessage(params.get("message") || "");
     }
   }, []);
@@ -40,7 +36,7 @@ export default function LoginPage() {
     setLoading(true);
     setError("");
 
-    const { error: signErr } = await supabase.auth.signInWithPassword({
+    const { data, error: signErr } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
@@ -51,7 +47,14 @@ export default function LoginPage() {
       return;
     }
 
-    router.replace(redirectTo || "/dashboard");
+    if (!data.session) {
+      setError("Connexion réussie mais session introuvable.");
+      setLoading(false);
+      return;
+    }
+
+    // force la navigation complète après création de session
+    window.location.href = redirectTo || "/dashboard";
   };
 
   return (
