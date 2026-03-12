@@ -25,7 +25,6 @@ export default async function DashboardPage() {
     console.error("Erreur chargement profil dashboard:", error);
   }
 
-  // ✅ fallback temporaire : si profile ou role absent, on envoie vers agent
   const role = profile?.role ?? "agent";
 
   if (role === "admin") {
