@@ -23,10 +23,10 @@ export default async function DashboardPage() {
 
   if (error) {
     console.error("Erreur chargement profil dashboard:", error);
-    redirect("/auth/login");
   }
 
-  const role = profile?.role;
+  // ✅ fallback temporaire : si profile ou role absent, on envoie vers agent
+  const role = profile?.role ?? "agent";
 
   if (role === "admin") {
     redirect("/dashboard/admin");
@@ -36,9 +36,5 @@ export default async function DashboardPage() {
     redirect("/dashboard/validateur");
   }
 
-  if (role === "agent") {
-    redirect("/dashboard/agent");
-  }
-
-  redirect("/auth/login");
+  redirect("/dashboard/agent");
 }
