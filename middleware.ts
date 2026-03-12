@@ -10,6 +10,6 @@ export const config = {
     "/dashboard/:path*",
     "/admin/:path*",
     "/profile/:path*",
-    "/validator/:path*",
+    "/dashboard/validateur/:path*",
   ],
 };
