@@ -25,7 +25,6 @@ export default async function AdminDashboardPage() {
 
   if (error) {
     console.error("Erreur chargement profil admin:", error);
-    redirect("/auth/login");
   }
 
   const role = profile?.role;
@@ -38,8 +37,9 @@ export default async function AdminDashboardPage() {
     redirect("/dashboard/validateur");
   }
 
+  // ✅ si pas admin ou profil absent, on envoie vers agent au lieu du login
   if (role !== "admin") {
-    redirect("/auth/login");
+    redirect("/dashboard/agent");
   }
 
   const { count: totalFiches } = await supabase
