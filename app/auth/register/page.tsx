@@ -22,6 +22,7 @@ export default function RegisterPage() {
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
 
   const router = useRouter();
@@ -30,8 +31,8 @@ export default function RegisterPage() {
     e.preventDefault();
     setLoading(true);
     setError("");
+    setSuccess("");
 
-    // 1) signUp
     const { data, error: signErr } = await supabase.auth.signUp({
       email,
       password,
@@ -46,34 +47,40 @@ export default function RegisterPage() {
       return;
     }
 
-    // 2) créer/mettre à jour profiles si uid disponible
-    // (si confirmation email activée, user existe mais session peut être null — uid reste exploitable)
     const uid = data.user?.id;
 
-    if (uid) {
-      // On tente upsert (si déjà créé par trigger -> OK)
-      const { error: profErr } = await supabase.from("profiles").upsert(
-        {
-          id: uid,
-          full_name: fullName,
-          role: "agent",
-        },
-        { onConflict: "id" }
-      );
-
-      // On ne bloque pas si RLS empêche l’upsert (selon ta config)
-      if (profErr) {
-        console.warn("profiles upsert error:", profErr.message);
-      }
+    if (!uid) {
+      setError("Compte créé mais identifiant utilisateur introuvable.");
+      setLoading(false);
+      return;
     }
 
-    // 3) retour login (message)
-    const msg = encodeURIComponent(
-      "Compte créé. Connectez-vous pour saisir la Fiche 1."
+    const { error: profErr } = await supabase.from("profiles").upsert(
+      {
+        id: uid,
+        full_name: fullName,
+        role: "agent",
+      },
+      { onConflict: "id" }
     );
-    router.push(`/auth/login?message=${msg}`);
 
+    if (profErr) {
+      setError(
+        "Compte créé, mais le profil n’a pas pu être enregistré dans profiles : " +
+          profErr.message
+      );
+      setLoading(false);
+      return;
+    }
+
+    const msg = encodeURIComponent(
+      "Compte créé avec succès. Connectez-vous maintenant."
+    );
+
+    setSuccess("Compte créé avec succès.");
     setLoading(false);
+
+    router.push(`/auth/login?message=${msg}`);
   };
 
   return (
@@ -93,7 +100,7 @@ export default function RegisterPage() {
               <Input
                 id="fullName"
                 type="text"
-                placeholder="Votre nom"
+                placeholder="Votre nom complet"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 required
@@ -111,6 +118,7 @@ export default function RegisterPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 disabled={loading}
+                autoComplete="email"
               />
             </div>
 
@@ -119,14 +127,17 @@ export default function RegisterPage() {
               <Input
                 id="password"
                 type="password"
+                placeholder="Votre mot de passe"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 disabled={loading}
+                autoComplete="new-password"
               />
             </div>
 
-            {error && <p className="text-sm text-red-600">{error}</p>}
+            {error ? <p className="text-sm text-red-600">{error}</p> : null}
+            {success ? <p className="text-sm text-green-600">{success}</p> : null}
 
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? "Inscription..." : "S'inscrire"}
