@@ -81,7 +81,6 @@ export default function Fiche1DynamicForm() {
   );
 
   const selectedRegionId = answers["1.01"] || "";
-  const selectedCercleId = answers["1.02"] || "";
 
   const sections = useMemo(() => {
     const map = new Map<string, Question[]>();
@@ -167,16 +166,14 @@ export default function Fiche1DynamicForm() {
   }, [answers, questions]);
 
   const getOptions = async (q: Question): Promise<RefOption[]> => {
-    const staticCacheKey = q.ref_table
+    const cacheKey = q.ref_table
       ? q.code === "1.02"
         ? `${q.ref_table}|region=${selectedRegionId || "none"}`
-        : q.code === "1.03"
-        ? `${q.ref_table}|cercle=${selectedCercleId || "none"}`
         : q.ref_table
       : q.code;
 
-    if (optionsCache[staticCacheKey]) {
-      return optionsCache[staticCacheKey];
+    if (optionsCache[cacheKey]) {
+      return optionsCache[cacheKey];
     }
 
     if (q.static_options && Array.isArray(q.static_options)) {
@@ -185,7 +182,7 @@ export default function Fiche1DynamicForm() {
         label: x?.label ?? String(x),
       }));
 
-      setOptionsCache((prev) => ({ ...prev, [staticCacheKey]: opts }));
+      setOptionsCache((prev) => ({ ...prev, [cacheKey]: opts }));
       return opts;
     }
 
@@ -194,28 +191,14 @@ export default function Fiche1DynamicForm() {
     const valueField = q.ref_value_field || "id";
     const labelField = q.ref_label_field || "label";
 
-    let cacheKey = q.ref_table;
-
-    if (q.code === "1.02") {
-      cacheKey = `${q.ref_table}|region=${selectedRegionId || "none"}`;
-      if (!selectedRegionId) return [];
+    if (q.code === "1.02" && !selectedRegionId) {
+      return [];
     }
-
-    if (q.code === "1.03") {
-      cacheKey = `${q.ref_table}|cercle=${selectedCercleId || "none"}`;
-      if (!selectedCercleId) return [];
-    }
-
-    if (optionsCache[cacheKey]) return optionsCache[cacheKey];
 
     let query = supabase.from(q.ref_table).select(`${valueField},${labelField}`);
 
     if (q.code === "1.02") {
       query = query.eq("region_id", selectedRegionId);
-    }
-
-    if (q.code === "1.03") {
-      query = query.eq("cercle_id", selectedCercleId);
     }
 
     query = query.order(labelField as any, { ascending: true });
@@ -246,7 +229,7 @@ export default function Fiche1DynamicForm() {
         }
       }
     })();
-  }, [questions, selectedRegionId, selectedCercleId]);
+  }, [questions, selectedRegionId]);
 
   const setAnswer = (code: string, value: any) => {
     if (code === "1.01") {
@@ -254,16 +237,6 @@ export default function Fiche1DynamicForm() {
         ...prev,
         ["1.01"]: value,
         ["1.02"]: "",
-        ["1.03"]: "",
-      }));
-      return;
-    }
-
-    if (code === "1.02") {
-      setAnswers((prev) => ({
-        ...prev,
-        ["1.02"]: value,
-        ["1.03"]: "",
       }));
       return;
     }
@@ -493,8 +466,6 @@ export default function Fiche1DynamicForm() {
       const cacheKey = q.ref_table
         ? q.code === "1.02"
           ? `${q.ref_table}|region=${selectedRegionId || "none"}`
-          : q.code === "1.03"
-          ? `${q.ref_table}|cercle=${selectedCercleId || "none"}`
           : q.ref_table
         : q.code;
 
@@ -504,17 +475,12 @@ export default function Fiche1DynamicForm() {
         <select
           className="w-full border rounded px-3 py-2"
           value={value}
-          disabled={
-            (q.code === "1.02" && !selectedRegionId) ||
-            (q.code === "1.03" && !selectedCercleId)
-          }
+          disabled={q.code === "1.02" && !selectedRegionId}
           onChange={(e) => setAnswer(q.code, smartCastSelectValue(e.target.value))}
         >
           <option value="">
             {q.code === "1.02" && !selectedRegionId
               ? "Choisis d’abord la région"
-              : q.code === "1.03" && !selectedCercleId
-              ? "Choisis d’abord le cercle"
               : "-- Choisir --"}
           </option>
 
@@ -531,8 +497,6 @@ export default function Fiche1DynamicForm() {
       const cacheKey = q.ref_table
         ? q.code === "1.02"
           ? `${q.ref_table}|region=${selectedRegionId || "none"}`
-          : q.code === "1.03"
-          ? `${q.ref_table}|cercle=${selectedCercleId || "none"}`
           : q.ref_table
         : q.code;
 
