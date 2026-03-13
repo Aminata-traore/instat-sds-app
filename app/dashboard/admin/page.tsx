@@ -19,17 +19,16 @@ export default async function AdminDashboardPage() {
 
   const { data: profile, error } = await supabase
     .from("profiles")
-    .select("role")
+    .select("role,is_active")
     .eq("id", session.user.id)
     .maybeSingle();
 
-  if (error) {
-    console.error("Erreur chargement profil admin:", error);
+  if (error || !profile?.role) {
     redirect("/profile");
   }
 
-  if (!profile?.role) {
-    redirect("/profile");
+  if (profile.is_active === false) {
+    redirect("/auth/login");
   }
 
   if (profile.role === "agent") {
@@ -58,22 +57,40 @@ export default async function AdminDashboardPage() {
     .select("id", { count: "exact", head: true })
     .eq("role", "validateur");
 
+  const { count: totalAdmins } = await supabase
+    .from("profiles")
+    .select("id", { count: "exact", head: true })
+    .eq("role", "admin");
+
+  const { count: totalActifs } = await supabase
+    .from("profiles")
+    .select("id", { count: "exact", head: true })
+    .eq("is_active", true);
+
   return (
     <AppShell title="Dashboard Admin">
       <div className="space-y-6">
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-5">
           <StatCard label="Fiches totales" value={totalFiches ?? 0} />
           <StatCard label="Agents" value={totalAgents ?? 0} />
           <StatCard label="Validateurs" value={totalValidateurs ?? 0} />
+          <StatCard label="Admins" value={totalAdmins ?? 0} />
+          <StatCard label="Comptes actifs" value={totalActifs ?? 0} />
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-4">
+          <ActionCard
+            title="Utilisateurs"
+            text="Créer des comptes, modifier les rôles et activer/désactiver."
+            href="/dashboard/admin/users"
+            cta="Gérer les utilisateurs"
+            primary
+          />
           <ActionCard
             title="Validation"
             text="Contrôler et suivre les fiches soumises."
             href="/admin"
             cta="Ouvrir"
-            primary
           />
           <ActionCard
             title="Statistiques"
