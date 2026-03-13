@@ -25,17 +25,23 @@ export default async function AgentDashboardPage() {
 
   if (error) {
     console.error("Erreur chargement profil agent:", error);
+    redirect("/profile");
   }
 
-  // ✅ fallback : si pas de profil ou role vide, on considère agent
-  const role = profile?.role ?? "agent";
+  if (!profile?.role) {
+    redirect("/profile");
+  }
 
-  if (role === "validateur") {
+  if (profile.role === "validateur") {
     redirect("/dashboard/validateur");
   }
 
-  if (role === "admin") {
+  if (profile.role === "admin") {
     redirect("/dashboard/admin");
+  }
+
+  if (profile.role !== "agent") {
+    redirect("/profile");
   }
 
   const { count: totalFiches } = await supabase
