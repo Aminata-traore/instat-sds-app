@@ -57,6 +57,12 @@ function smartCastSelectValue(raw: string) {
   return Number.isFinite(n) && String(n) === raw ? n : raw;
 }
 
+function normalizeIntOrNull(v: any) {
+  if (v === "" || v === null || v === undefined) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
 function isFreeTextFallback(code: string) {
   return ["2.02", "2.03", "3.02", "3.05", "3.08"].includes(code);
 }
@@ -161,11 +167,26 @@ export default function Fiche1DynamicForm() {
   }, [answers, questions]);
 
   const getOptions = async (q: Question): Promise<RefOption[]> => {
+    const staticCacheKey = q.ref_table
+      ? q.code === "1.02"
+        ? `${q.ref_table}|region=${selectedRegionId || "none"}`
+        : q.code === "1.03"
+        ? `${q.ref_table}|cercle=${selectedCercleId || "none"}`
+        : q.ref_table
+      : q.code;
+
+    if (optionsCache[staticCacheKey]) {
+      return optionsCache[staticCacheKey];
+    }
+
     if (q.static_options && Array.isArray(q.static_options)) {
-      return q.static_options.map((x: any) => ({
+      const opts = q.static_options.map((x: any) => ({
         value: x?.value ?? x,
         label: x?.label ?? String(x),
       }));
+
+      setOptionsCache((prev) => ({ ...prev, [staticCacheKey]: opts }));
+      return opts;
     }
 
     if (!q.ref_table) return [];
@@ -269,7 +290,8 @@ export default function Fiche1DynamicForm() {
       };
 
       if (q.field_type === "number") {
-        row.value_number = Number(v);
+        const n = Number(v);
+        row.value_number = Number.isFinite(n) ? n : null;
       } else if (q.field_type === "yesno" || q.field_type === "checkbox") {
         row.value_bool = toBool(v);
       } else if (q.field_type === "multiselect" && !isFreeTextFallback(q.code)) {
@@ -308,11 +330,11 @@ export default function Fiche1DynamicForm() {
     const uid = u.user?.id ?? null;
 
     const payload = {
-      region_id: answers["1.01"],
-      cercle_id: answers["1.02"],
-      structure_id: answers["1.03"],
+      region_id: normalizeIntOrNull(answers["1.01"]),
+      cercle_id: normalizeIntOrNull(answers["1.02"]),
+      structure_id: normalizeIntOrNull(answers["1.03"]),
       responsable_nom: String(answers["1.04"] || ""),
-      annee: Number(answers["1.05"]),
+      annee: normalizeIntOrNull(answers["1.05"]),
       numero_fiche: String(answers["1.06"] || ""),
       statut,
       created_by: uid,
@@ -374,9 +396,8 @@ export default function Fiche1DynamicForm() {
         .upsert(rows, { onConflict: "fiche1_id,question_code" });
 
       if (ansErr) {
-        throw new Error(
-          "Erreur sauvegarde answers_fiche1. Vérifie la contrainte unique fiche1_id,question_code."
-        );
+        console.error(ansErr);
+        throw new Error(ansErr.message || "Erreur sauvegarde answers_fiche1.");
       }
 
       await saveHistory(
@@ -469,14 +490,15 @@ export default function Fiche1DynamicForm() {
     }
 
     if (q.field_type === "select") {
-      const cacheKey =
-        q.code === "1.02"
+      const cacheKey = q.ref_table
+        ? q.code === "1.02"
           ? `${q.ref_table}|region=${selectedRegionId || "none"}`
           : q.code === "1.03"
           ? `${q.ref_table}|cercle=${selectedCercleId || "none"}`
-          : q.ref_table || "";
+          : q.ref_table
+        : q.code;
 
-      const opts = (cacheKey && optionsCache[cacheKey]) || [];
+      const opts = optionsCache[cacheKey] || [];
 
       return (
         <select
@@ -506,7 +528,14 @@ export default function Fiche1DynamicForm() {
     }
 
     if (q.field_type === "multiselect") {
-      const cacheKey = q.ref_table || q.code;
+      const cacheKey = q.ref_table
+        ? q.code === "1.02"
+          ? `${q.ref_table}|region=${selectedRegionId || "none"}`
+          : q.code === "1.03"
+          ? `${q.ref_table}|cercle=${selectedCercleId || "none"}`
+          : q.ref_table
+        : q.code;
+
       const opts = (optionsCache[cacheKey] || []) as RefOption[];
       const arr: any[] = Array.isArray(value) ? value : [];
 
@@ -542,7 +571,7 @@ export default function Fiche1DynamicForm() {
                     }
                   }}
                 />
-                {o.label}
+                <span>{o.label}</span>
               </label>
             );
           })}
