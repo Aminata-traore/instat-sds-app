@@ -25,21 +25,23 @@ export default async function ValidateurDashboardPage() {
 
   if (error) {
     console.error("Erreur chargement profil validateur:", error);
+    redirect("/profile");
   }
 
-  const role = profile?.role;
+  if (!profile?.role) {
+    redirect("/profile");
+  }
 
-  if (role === "agent") {
+  if (profile.role === "agent") {
     redirect("/dashboard/agent");
   }
 
-  if (role === "admin") {
+  if (profile.role === "admin") {
     redirect("/dashboard/admin");
   }
 
-  // ✅ si pas validateur ou profil absent, on envoie vers agent au lieu du login
-  if (role !== "validateur") {
-    redirect("/dashboard/agent");
+  if (profile.role !== "validateur") {
+    redirect("/profile");
   }
 
   const { count: enAttente } = await supabase
