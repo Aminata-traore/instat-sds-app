@@ -23,17 +23,24 @@ export default async function DashboardPage() {
 
   if (error) {
     console.error("Erreur chargement profil dashboard:", error);
+    redirect("/profile");
   }
 
-  const role = profile?.role ?? "agent";
+  if (!profile?.role) {
+    redirect("/profile");
+  }
 
-  if (role === "admin") {
+  if (profile.role === "admin") {
     redirect("/dashboard/admin");
   }
 
-  if (role === "validateur") {
+  if (profile.role === "validateur") {
     redirect("/dashboard/validateur");
   }
 
-  redirect("/dashboard/agent");
+  if (profile.role === "agent") {
+    redirect("/dashboard/agent");
+  }
+
+  redirect("/profile");
 }
